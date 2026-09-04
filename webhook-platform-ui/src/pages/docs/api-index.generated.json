@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 187,
+  "operationCount": 202,
   "security": [
     {
       "id": "bearerAuth",
@@ -357,6 +357,43 @@
           }
         },
         {
+          "id": "rotateApiKey",
+          "method": "POST",
+          "path": "/api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate",
+          "summary": "Rotate API key",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "apiKeyId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "201",
+              "description": "Replacement key created; the old key is retiring",
+              "type": "ApiKeyResponse"
+            }
+          ],
+          "description": "Issues a replacement key and puts the old one into a grace window, during which both authenticate. The replacement is shown only once. Default window is 24 hours; pass gracePeriodHours=0 to cut the old key off immediately after a suspected leak.",
+          "body": {
+            "contentType": "application/json",
+            "type": "ApiKeyRotateRequest",
+            "required": false
+          }
+        },
+        {
           "id": "revokeApiKey",
           "method": "DELETE",
           "path": "/api/v1/projects/{projectId}/api-keys/{apiKeyId}",
@@ -565,6 +602,67 @@
             }
           ],
           "description": "Verifies user email with the token sent to their email"
+        },
+        {
+          "id": "switchOrganization",
+          "method": "POST",
+          "path": "/api/v1/auth/switch-organization",
+          "summary": "Switch organization",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [
+            {
+              "name": "refresh_token",
+              "in": "cookie",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Access token re-issued for the target organization",
+              "type": "AuthResponse"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated, or no live session",
+              "type": "AuthResponse"
+            },
+            {
+              "status": "403",
+              "description": "Caller is not a member of that organization",
+              "type": "AuthResponse"
+            }
+          ],
+          "description": "Re-issues an access token scoped to another organization the caller belongs to. The refresh token is untouched and no other session is affected; the new token's role comes from the membership in the target organization, not from the token being replaced.",
+          "body": {
+            "contentType": "application/json",
+            "type": "SwitchOrganizationRequest",
+            "required": true
+          }
+        },
+        {
+          "id": "revokeAllSessions",
+          "method": "POST",
+          "path": "/api/v1/auth/sessions/revoke-all",
+          "summary": "Sign out everywhere",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "204",
+              "description": "All sessions revoked"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated"
+            }
+          ],
+          "description": "Ends every session for the authenticated user, including the one making the call."
         },
         {
           "id": "resetPassword",
@@ -809,6 +907,36 @@
           }
         },
         {
+          "id": "listSessions",
+          "method": "GET",
+          "path": "/api/v1/auth/sessions",
+          "summary": "List active sessions",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [
+            {
+              "name": "refresh_token",
+              "in": "cookie",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Sessions returned",
+              "type": "SessionResponse[]"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated",
+              "type": "SessionResponse[]"
+            }
+          ],
+          "description": "Returns every live sign-in for the authenticated user — browser sessions and CLI device-code grants alike — with the session making the request flagged as current. No token material is returned."
+        },
+        {
           "id": "getCurrentUser",
           "method": "GET",
           "path": "/api/v1/auth/me",
@@ -830,6 +958,38 @@
             }
           ],
           "description": "Returns information about the authenticated user"
+        },
+        {
+          "id": "revokeSession",
+          "method": "DELETE",
+          "path": "/api/v1/auth/sessions/{sessionId}",
+          "summary": "Revoke a session",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [
+            {
+              "name": "sessionId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "204",
+              "description": "Session revoked"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated"
+            },
+            {
+              "status": "404",
+              "description": "No such session for this user"
+            }
+          ],
+          "description": "Signs one device out. The session's refresh token stops working and so does the access token it already issued, rather than surviving until its own expiry."
         }
       ]
     },
@@ -1150,6 +1310,69 @@
       "description": "DLQ management operations",
       "operations": [
         {
+          "id": "retryIncomingDlqItem",
+          "method": "POST",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}/retry",
+          "summary": "Retry single incoming DLQ item",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "forwardAttemptId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Forward queued for retry",
+              "type": "DlqActionResponse"
+            }
+          ],
+          "description": "Re-forwards one abandoned forward to the destination that failed"
+        },
+        {
+          "id": "retryIncomingDlqItems",
+          "method": "POST",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/retry",
+          "summary": "Bulk retry incoming DLQ items",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Forwards queued for retry",
+              "type": "DlqActionResponse"
+            }
+          ],
+          "description": "Re-forwards several abandoned forwards, each to the destination that failed",
+          "body": {
+            "contentType": "application/json",
+            "type": "IncomingDlqRetryRequest",
+            "required": true
+          }
+        },
+        {
           "id": "retrySingle",
           "method": "POST",
           "path": "/api/v1/projects/{projectId}/dlq/{deliveryId}/retry",
@@ -1211,6 +1434,134 @@
             "type": "DlqRetryRequest",
             "required": true
           }
+        },
+        {
+          "id": "listIncomingDlqItems",
+          "method": "GET",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq",
+          "summary": "List incoming DLQ items",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "page",
+              "in": "query",
+              "required": false,
+              "type": "integer (int32)"
+            },
+            {
+              "name": "size",
+              "in": "query",
+              "required": false,
+              "type": "integer (int32)"
+            },
+            {
+              "name": "destinationId",
+              "in": "query",
+              "required": false,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "OK",
+              "type": "PageIncomingDlqItemResponse"
+            }
+          ],
+          "description": "Returns paginated list of abandoned forwards in the incoming DLQ"
+        },
+        {
+          "id": "purgeIncomingDlq",
+          "method": "DELETE",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq",
+          "summary": "Purge all incoming DLQ items",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Incoming DLQ purged",
+              "type": "DlqActionResponse"
+            }
+          ],
+          "description": "Permanently deletes every abandoned forward in the project's incoming DLQ"
+        },
+        {
+          "id": "getIncomingDlqItem",
+          "method": "GET",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}",
+          "summary": "Get incoming DLQ item details",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "forwardAttemptId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "OK",
+              "type": "IncomingDlqItemResponse"
+            }
+          ],
+          "description": "Returns details of a single abandoned forward"
+        },
+        {
+          "id": "getIncomingDlqStats",
+          "method": "GET",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/stats",
+          "summary": "Get incoming DLQ stats",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "OK",
+              "type": "DlqStatsResponse"
+            }
+          ],
+          "description": "Returns incoming DLQ statistics for the project"
         },
         {
           "id": "listDlqItems",
@@ -1772,6 +2123,32 @@
           "body": {
             "contentType": "application/json",
             "type": "DeviceTokenRequest",
+            "required": true
+          }
+        },
+        {
+          "id": "denyDeviceCode",
+          "method": "POST",
+          "path": "/api/v1/auth/device/deny",
+          "summary": "Deny device code",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Device code denied"
+            },
+            {
+              "status": "404",
+              "description": "Code not found or already used"
+            }
+          ],
+          "description": "Called by the authenticated user in the browser to refuse a device login request they did not start. The waiting CLI stops with 403 on its next poll instead of holding the code open until it expires.",
+          "body": {
+            "contentType": "application/json",
+            "type": "DeviceDenyRequest",
             "required": true
           }
         },
@@ -2503,7 +2880,7 @@
             {
               "status": "201",
               "description": "Event accepted for delivery",
-              "type": "object"
+              "type": "EventIngestResponse"
             },
             {
               "status": "401",
@@ -2513,7 +2890,7 @@
             {
               "status": "429",
               "description": "Rate limit exceeded",
-              "type": "object"
+              "type": "ErrorResponse"
             }
           ],
           "description": "Sends an event to all subscribed webhook endpoints. Requires API Key authentication.",
@@ -3598,7 +3975,7 @@
             },
             {
               "status": "429",
-              "description": "Rate limit exceeded",
+              "description": "Rate limit or monthly event quota exceeded",
               "type": "IngressResponse"
             }
           ],
@@ -3754,6 +4131,102 @@
             "type": "AddMemberRequest",
             "required": true
           }
+        },
+        {
+          "id": "suspendMember",
+          "method": "POST",
+          "path": "/api/v1/orgs/{orgId}/members/{userId}/suspend",
+          "summary": "Suspend member",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "orgId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "userId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Member suspended",
+              "type": "MemberResponse"
+            }
+          ],
+          "description": "Suspends a member: the membership and its role are kept, the member is refused access, and their current sessions end immediately"
+        },
+        {
+          "id": "reinstateMember",
+          "method": "POST",
+          "path": "/api/v1/orgs/{orgId}/members/{userId}/reinstate",
+          "summary": "Reinstate member",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "orgId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "userId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Member reinstated",
+              "type": "MemberResponse"
+            }
+          ],
+          "description": "Lifts a suspension, restoring the member's access in the role they kept"
+        },
+        {
+          "id": "reissueInvite",
+          "method": "POST",
+          "path": "/api/v1/orgs/{orgId}/members/{userId}/invite",
+          "summary": "Re-issue invite",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "orgId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "userId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Invite re-issued",
+              "type": "MemberResponse"
+            }
+          ],
+          "description": "Issues a fresh invite token for a member whose invite is still pending, replacing the previous one and restarting its 48-hour expiry. The accept-invite link is returned so an owner can pass it on when email delivery is not configured."
         },
         {
           "id": "acceptInvite",
@@ -6775,6 +7248,28 @@
         "name": "key",
         "type": "string",
         "required": false
+      },
+      {
+        "name": "rotatedAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "replacedById",
+        "type": "string (uuid)",
+        "required": false
+      }
+    ],
+    "ApiKeyRotateRequest": [
+      {
+        "name": "gracePeriodHours",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "expiresAt",
+        "type": "string (date-time)",
+        "required": false
       }
     ],
     "AuditLogData": [
@@ -7096,6 +7591,11 @@
           "VIEWER",
           "API_KEY"
         ]
+      },
+      {
+        "name": "emailDeliveryEnabled",
+        "type": "boolean",
+        "required": false
       }
     ],
     "DailyUsage": [
@@ -7445,6 +7945,13 @@
         "required": false
       }
     ],
+    "DeviceDenyRequest": [
+      {
+        "name": "userCode",
+        "type": "string",
+        "required": true
+      }
+    ],
     "DeviceTokenRequest": [
       {
         "name": "deviceCode",
@@ -7771,7 +8278,8 @@
       {
         "name": "rateLimitPerSecond",
         "type": "integer (int32)",
-        "required": false
+        "required": false,
+        "description": "Per-endpoint delivery throttle. 0 removes the limit."
       },
       {
         "name": "allowedSourceIps",
@@ -7913,6 +8421,28 @@
         "required": false
       }
     ],
+    "ErrorResponse": [
+      {
+        "name": "error",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "status",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "fieldErrors",
+        "type": "map<string, string>",
+        "required": false
+      }
+    ],
     "EventDiffResponse": [
       {
         "name": "leftEventId",
@@ -7967,6 +8497,33 @@
         "required": true
       }
     ],
+    "EventIngestResponse": [
+      {
+        "name": "eventId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "deliveriesCreated",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "schemaWarnings",
+        "type": "string[]",
+        "required": false
+      }
+    ],
     "EventResponse": [
       {
         "name": "id",
@@ -7997,6 +8554,11 @@
         "name": "deliveriesCreated",
         "type": "integer (int32)",
         "required": false
+      },
+      {
+        "name": "schemaWarnings",
+        "type": "string[]",
+        "required": false
       }
     ],
     "EventSchemaVersionRequest": [
@@ -8008,7 +8570,14 @@
       {
         "name": "compatibilityMode",
         "type": "string",
-        "required": false
+        "required": false,
+        "description": "Compatibility promise checked against the previous version. Defaults to the previous version's mode, or NONE for the first version.",
+        "values": [
+          "NONE",
+          "BACKWARD",
+          "FORWARD",
+          "FULL"
+        ]
       },
       {
         "name": "description",
@@ -8050,7 +8619,13 @@
       {
         "name": "compatibilityMode",
         "type": "string",
-        "required": false
+        "required": false,
+        "values": [
+          "NONE",
+          "BACKWARD",
+          "FORWARD",
+          "FULL"
+        ]
       },
       {
         "name": "description",
@@ -8454,7 +9029,7 @@
         "name": "transformationId",
         "type": "string (uuid)",
         "required": false,
-        "description": "ID of a reusable transformation template to apply (overrides payloadTransform if set)"
+        "description": "ID of a reusable transformation template to apply (overrides payloadTransform if set). Empty string detaches the destination from its template."
       }
     ],
     "IncomingDestinationResponse": [
@@ -8538,6 +9113,75 @@
         "name": "updatedAt",
         "type": "string (date-time)",
         "required": false
+      }
+    ],
+    "IncomingDlqItemResponse": [
+      {
+        "name": "forwardAttemptId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "incomingEventId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "destinationId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "incomingSourceId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "sourceName",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "destinationUrl",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "attemptNumber",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "maxAttempts",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "responseCode",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "lastError",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "failedAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      }
+    ],
+    "IncomingDlqRetryRequest": [
+      {
+        "name": "forwardAttemptIds",
+        "type": "string (uuid)[]",
+        "required": true
       }
     ],
     "IncomingEventResponse": [
@@ -8671,6 +9315,16 @@
         "required": false
       },
       {
+        "name": "requestHeadersJson",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "requestBodySnippet",
+        "type": "string",
+        "required": false
+      },
+      {
         "name": "responseCode",
         "type": "integer (int32)",
         "required": false
@@ -8768,8 +9422,7 @@
           "STRIPE",
           "SHOPIFY",
           "SLACK",
-          "TWILIO",
-          "CUSTOM"
+          "TWILIO"
         ]
       },
       {
@@ -8850,8 +9503,7 @@
           "STRIPE",
           "SHOPIFY",
           "SLACK",
-          "TWILIO",
-          "CUSTOM"
+          "TWILIO"
         ]
       },
       {
@@ -9163,6 +9815,16 @@
       {
         "name": "createdAt",
         "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "inviteExpiresAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "inviteUrl",
+        "type": "string",
         "required": false
       }
     ],
@@ -9924,6 +10586,63 @@
       {
         "name": "content",
         "type": "IncomingDestinationResponse[]",
+        "required": false
+      },
+      {
+        "name": "number",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "sort",
+        "type": "SortObject",
+        "required": false
+      },
+      {
+        "name": "pageable",
+        "type": "PageableObject",
+        "required": false
+      },
+      {
+        "name": "numberOfElements",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "first",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "last",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "empty",
+        "type": "boolean",
+        "required": false
+      }
+    ],
+    "PageIncomingDlqItemResponse": [
+      {
+        "name": "totalPages",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "totalElements",
+        "type": "integer (int64)",
+        "required": false
+      },
+      {
+        "name": "size",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "content",
+        "type": "IncomingDlqItemResponse[]",
         "required": false
       },
       {
@@ -11082,6 +11801,52 @@
         "required": false
       }
     ],
+    "SessionResponse": [
+      {
+        "name": "id",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "client",
+        "type": "string",
+        "required": false,
+        "values": [
+          "WEB",
+          "CLI"
+        ]
+      },
+      {
+        "name": "userAgent",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "ipAddress",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "lastSeenAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "expiresAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "current",
+        "type": "boolean",
+        "required": false
+      }
+    ],
     "SharedDebugLinkPublicResponse": [
       {
         "name": "eventType",
@@ -11207,7 +11972,8 @@
           "RUNNING",
           "SUCCESS",
           "FAILED",
-          "SKIPPED"
+          "SKIPPED",
+          "WAITING"
         ]
       },
       {
@@ -11415,6 +12181,13 @@
         "name": "updatedAt",
         "type": "string (date-time)",
         "required": false
+      }
+    ],
+    "SwitchOrganizationRequest": [
+      {
+        "name": "organizationId",
+        "type": "string (uuid)",
+        "required": true
       }
     ],
     "TestEndpointRequest": [
@@ -12114,6 +12887,7 @@
         "required": false,
         "values": [
           "RUNNING",
+          "WAITING",
           "COMPLETED",
           "FAILED",
           "CANCELLED"
@@ -12411,7 +13185,13 @@
       "revokedAt": "2026-01-01T12:00:00Z",
       "expiresAt": "2026-01-01T12:00:00Z",
       "scope": "string",
-      "key": "string"
+      "key": "string",
+      "rotatedAt": "2026-01-01T12:00:00Z",
+      "replacedById": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "ApiKeyRotateRequest": {
+      "gracePeriodHours": 0,
+      "expiresAt": "2026-01-01T12:00:00Z"
     },
     "AuditLogData": {
       "action": "string",
@@ -12500,7 +13280,8 @@
         "name": "string",
         "createdAt": "2026-01-01T12:00:00Z"
       },
-      "role": "OWNER"
+      "role": "OWNER",
+      "emailDeliveryEnabled": true
     },
     "DailyUsage": {
       "date": "string",
@@ -12616,6 +13397,9 @@
       "expiresInSeconds": 0,
       "pollIntervalSeconds": 0,
       "expiresAt": "2026-01-01T12:00:00Z"
+    },
+    "DeviceDenyRequest": {
+      "userCode": "string"
     },
     "DeviceTokenRequest": {
       "deviceCode": "string"
@@ -12734,6 +13518,14 @@
       "latencyMs": 0,
       "message": "string"
     },
+    "ErrorResponse": {
+      "error": "string",
+      "message": "string",
+      "status": 0,
+      "fieldErrors": {
+        "key": "string"
+      }
+    },
     "EventDiffResponse": {
       "leftEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "rightEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -12755,17 +13547,29 @@
       "type": "string",
       "data": {}
     },
+    "EventIngestResponse": {
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "type": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "deliveriesCreated": 0,
+      "schemaWarnings": [
+        "string"
+      ]
+    },
     "EventResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "eventType": "string",
       "payload": "string",
       "createdAt": "2026-01-01T12:00:00Z",
-      "deliveriesCreated": 0
+      "deliveriesCreated": 0,
+      "schemaWarnings": [
+        "string"
+      ]
     },
     "EventSchemaVersionRequest": {
       "schemaJson": "string",
-      "compatibilityMode": "string",
+      "compatibilityMode": "NONE",
       "description": "string"
     },
     "EventSchemaVersionResponse": {
@@ -12775,7 +13579,7 @@
       "schemaJson": "string",
       "fingerprint": "string",
       "status": "string",
-      "compatibilityMode": "string",
+      "compatibilityMode": "NONE",
       "description": "string",
       "createdBy": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "createdAt": "2026-01-01T12:00:00Z"
@@ -12934,6 +13738,25 @@
       "createdAt": "2026-01-01T12:00:00Z",
       "updatedAt": "2026-01-01T12:00:00Z"
     },
+    "IncomingDlqItemResponse": {
+      "forwardAttemptId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "destinationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "sourceName": "string",
+      "destinationUrl": "string",
+      "attemptNumber": 0,
+      "maxAttempts": 0,
+      "responseCode": 0,
+      "lastError": "string",
+      "failedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "IncomingDlqRetryRequest": {
+      "forwardAttemptIds": [
+        "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      ]
+    },
     "IncomingEventResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -12961,6 +13784,8 @@
       "status": "PENDING",
       "startedAt": "2026-01-01T12:00:00Z",
       "finishedAt": "2026-01-01T12:00:00Z",
+      "requestHeadersJson": "string",
+      "requestBodySnippet": "string",
       "responseCode": 0,
       "responseHeadersJson": "string",
       "responseBodySnippet": "string",
@@ -13075,7 +13900,9 @@
       "email": "string",
       "role": "OWNER",
       "status": "INVITED",
-      "createdAt": "2026-01-01T12:00:00Z"
+      "createdAt": "2026-01-01T12:00:00Z",
+      "inviteExpiresAt": "2026-01-01T12:00:00Z",
+      "inviteUrl": "string"
     },
     "MtlsConfigRequest": {
       "clientCert": "string",
@@ -13208,7 +14035,9 @@
           "revokedAt": "2026-01-01T12:00:00Z",
           "expiresAt": "2026-01-01T12:00:00Z",
           "scope": "string",
-          "key": "string"
+          "key": "string",
+          "rotatedAt": "2026-01-01T12:00:00Z",
+          "replacedById": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
         }
       ],
       "number": 0,
@@ -13440,7 +14269,8 @@
           "eventType": "string",
           "payload": "string",
           "createdAt": "2026-01-01T12:00:00Z",
-          "deliveriesCreated": 0
+          "deliveriesCreated": 0,
+          "schemaWarnings": []
         }
       ],
       "number": 0,
@@ -13541,6 +14371,45 @@
       "last": true,
       "empty": true
     },
+    "PageIncomingDlqItemResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "forwardAttemptId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "destinationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "sourceName": "string",
+          "destinationUrl": "string",
+          "attemptNumber": 0,
+          "maxAttempts": 0,
+          "responseCode": 0,
+          "lastError": "string",
+          "failedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
     "PageIncomingEventResponse": {
       "totalPages": 0,
       "totalElements": 0,
@@ -13598,6 +14467,8 @@
           "status": "PENDING",
           "startedAt": "2026-01-01T12:00:00Z",
           "finishedAt": "2026-01-01T12:00:00Z",
+          "requestHeadersJson": "string",
+          "requestBodySnippet": "string",
           "responseCode": 0,
           "responseHeadersJson": "string",
           "responseBodySnippet": "string",
@@ -14038,6 +14909,16 @@
       "breaking": true,
       "createdAt": "2026-01-01T12:00:00Z"
     },
+    "SessionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "client": "WEB",
+      "userAgent": "string",
+      "ipAddress": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "lastSeenAt": "2026-01-01T12:00:00Z",
+      "expiresAt": "2026-01-01T12:00:00Z",
+      "current": true
+    },
     "SharedDebugLinkPublicResponse": {
       "eventType": "string",
       "sanitizedPayload": "string",
@@ -14117,6 +14998,9 @@
       "transformationName": "string",
       "createdAt": "2026-01-01T12:00:00Z",
       "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "SwitchOrganizationRequest": {
+      "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
     },
     "TestEndpointRequest": {
       "name": "string",

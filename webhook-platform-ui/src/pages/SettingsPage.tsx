@@ -6,11 +6,13 @@ import { usePermissions } from '../auth/usePermissions';
 import { authApi } from '../api/auth.api';
 import { showApiError, showSuccess } from '../lib/toast';
 import { getStoredTimezone, setStoredTimezone } from '../lib/date';
+import { forgetIntent, isAnyDismissed, setAllDismissed } from '../lib/onboarding';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import StatusBadge from '../components/StatusBadge';
 import { RoleCard } from '../components/PermissionGate';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+import ActiveSessions from '../components/ActiveSessions';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -140,6 +142,7 @@ export default function SettingsPage() {
 
   const [selectedTz, setSelectedTz] = useState(getStoredTimezone);
   const [notifPrefs, setNotifPrefsState] = useState<NotificationPrefs>(getNotifPrefs);
+  const [showGettingStarted, setShowGettingStarted] = useState(() => !isAnyDismissed());
 
   useEffect(() => {
     setFullName(user?.user?.fullName || '');
@@ -335,6 +338,13 @@ export default function SettingsPage() {
           </form>
 
           <FormSection
+            title={t('settings.sessions.title')}
+            description={t('settings.sessions.description')}
+          >
+            <ActiveSessions />
+          </FormSection>
+
+          <FormSection
             title={t('settings.timezone.title')}
             description={t('settings.timezone.description')}
           >
@@ -384,6 +394,45 @@ export default function SettingsPage() {
                   />
                 </label>
               ))}
+            </div>
+            <p className="text-xs text-muted-foreground">{t('settings.deviceOnly')}</p>
+          </FormSection>
+
+          <FormSection
+            title={t('settings.gettingStarted.title')}
+            description={t('settings.gettingStarted.description')}
+          >
+            <div className="divide-y divide-rail">
+              <label className="flex cursor-pointer items-center justify-between gap-4 py-3 first:pt-0">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{t('settings.gettingStarted.show')}</span>
+                  <span className="block text-xs text-muted-foreground">{t('settings.gettingStarted.showHint')}</span>
+                </span>
+                <Switch
+                  checked={showGettingStarted}
+                  onCheckedChange={(checked) => {
+                    setShowGettingStarted(checked);
+                    setAllDismissed(!checked);
+                  }}
+                  aria-label={t('settings.gettingStarted.show')}
+                />
+              </label>
+              <div className="flex items-center justify-between gap-4 py-3 last:pb-0">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{t('settings.gettingStarted.askAgain')}</span>
+                  <span className="block text-xs text-muted-foreground">{t('settings.gettingStarted.askAgainHint')}</span>
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    forgetIntent();
+                    showSuccess(t('settings.gettingStarted.asked'));
+                  }}
+                >
+                  {t('settings.gettingStarted.askAgain')}
+                </Button>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">{t('settings.deviceOnly')}</p>
           </FormSection>

@@ -3,6 +3,7 @@ package com.webhook.platform.api.service.workflow.executors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
 import com.webhook.platform.api.service.workflow.StepResult;
@@ -11,15 +12,24 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
- * HTTP Request node — makes an outbound HTTP call.
- * Reuses SSRF protection via {@link UrlValidator}.
+ * HTTP Request node — makes an outbound HTTP call to a URL the workflow's author typed.
+ *
+ * <p>That makes it the one node a user can aim, so it carries both halves of the SSRF defence:
+ * {@link UrlValidator} refuses a URL that resolves somewhere private, and
+ * {@link SsrfProtectionCustomizer} re-checks the address the connector actually dials. The
+ * second is not redundant — validating and connecting are two separate resolutions of the same
+ * name, and a name can move between them. This class previously claimed to "reuse SSRF
+ * protection" while building a bare client, so only the first half was true.
  */
 @Component
 @Slf4j
@@ -28,14 +38,20 @@ public class HttpNodeExecutor implements NodeExecutor {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final boolean allowPrivateIps;
+    private final List<String> allowedHosts;
 
     public HttpNodeExecutor(
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
-        this.webClient = webClientBuilder.build();
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+        this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(
+                        SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps)))
+                .build();
         this.objectMapper = objectMapper;
         this.allowPrivateIps = allowPrivateIps;
+        this.allowedHosts = allowedHosts;
     }
 
     @Override
@@ -51,8 +67,11 @@ public class HttpNodeExecutor implements NodeExecutor {
                 return StepResult.failed("HTTP node: url is required");
             }
 
-            // SSRF protection
-            UrlValidator.validateWebhookUrl(url, allowPrivateIps, null);
+            // Passing the configured allow-list rather than null: it is an exemption list, so
+            // null did not weaken the check — it meant an operator who allow-listed an internal
+            // host for every other outbound path could not reach it from a workflow node. One
+            // WEBHOOK_ALLOWED_HOSTS should mean one thing everywhere.
+            UrlValidator.validateWebhookUrl(url, allowPrivateIps, allowedHosts);
 
             String method = getTextOrDefault(nodeConfig, "method", "POST");
             int timeoutSeconds = nodeConfig.has("timeout") ? nodeConfig.get("timeout").asInt(30) : 30;

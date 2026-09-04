@@ -33,6 +33,34 @@ public class WorkflowExecutionPersistence {
      * Atomically update execution status + completedAt + durationMs + errorMessage.
      * findById + save run in a single transaction — no partial writes on crash.
      */
+    /**
+     * Parks an execution until {@code resumeAt}, keeping everything needed to continue it.
+     *
+     * <p>The counterpart of {@link #completeExecution}: the execution is neither finished nor
+     * running, so it must leave RUNNING — otherwise {@code WorkflowExecutionRecoveryJob} would
+     * find a five-minute delay indistinguishable from a hung execution and fail it. That job
+     * sweeps RUNNING only, which is what makes WAITING safe.
+     */
+    @Transactional
+    public void suspendExecution(UUID executionId, Instant resumeAt, JsonNode state, long workingMs) {
+        executionRepository.findById(executionId).ifPresent(exec -> {
+            exec.setStatus(ExecutionStatus.WAITING);
+            exec.setResumeAt(resumeAt);
+            exec.setWorkingMs(workingMs);
+            try {
+                exec.setResumeState(objectMapper.writeValueAsString(state));
+            } catch (Exception e) {
+                // A snapshot that cannot be written is an execution that cannot be resumed, so
+                // fail it now rather than leaving a row that WAITING will never wake from.
+                log.error("Could not serialise resume state for execution {}: {}", executionId, e.getMessage());
+                exec.setStatus(ExecutionStatus.FAILED);
+                exec.setErrorMessage("Could not persist resume state: " + e.getMessage());
+                exec.setCompletedAt(Instant.now());
+            }
+            executionRepository.save(exec);
+        });
+    }
+
     @Transactional
     public void completeExecution(UUID executionId, ExecutionStatus status, String error, long startTime) {
         executionRepository.findById(executionId).ifPresent(exec -> {

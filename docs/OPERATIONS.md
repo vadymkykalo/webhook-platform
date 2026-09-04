@@ -74,6 +74,18 @@ malformed `retryDelays` is rejected with a `400` at write time; a stored one tha
 not parse fails its delivery terminally with `INVALID_RETRY_LADDER` rather than being retried on
 a substituted ladder.
 
+## Known limitations
+
+Recorded here rather than left to be discovered during an incident.
+
+**A Postgres restore does not reconcile Kafka and Redis.** A point-in-time or full restore leaves
+in-flight outbox rows, Kafka messages already published for events the restore rolled back, and
+Redis counters that no longer agree with the restored database. There is no written procedure for
+reconciling the three — see [Backup & Restore](#backup--restore) for the detail.
+
+**Delivery is at-least-once.** An Attempt can succeed at the endpoint and fail to record. Receivers
+must dedupe on the delivery id, which the `webhook-id` header carries unchanged across retries.
+
 ## Common Issues
 
 ### High Kafka lag
@@ -86,10 +98,36 @@ a substituted ladder.
 - Check connections: `docker exec webhook-postgres pg_isready`
 - Connection pool exhausted: increase `DB_POOL_MAX_SIZE` (API) or `WORKER_DB_POOL_MAX_SIZE` (Worker) — separately named on purpose, see `.env.dist`
 
+### "Too many failed sign-in attempts" — a locked account
+An account locks after `AUTH_LOCKOUT_THRESHOLD` consecutive failed sign-ins (default 5). There is
+deliberately no administrator unlock, because one would make locking a known email address a
+denial of service with no self-service way out. Two things end a lockout, both available to the
+account holder:
+- **Wait.** The window starts at `AUTH_LOCKOUT_INITIAL_SECONDS` (60), doubles per further failure
+  and is capped at `AUTH_LOCKOUT_MAX_SECONDS` (900). It lapses on its own.
+- **Reset the password.** Completing a reset clears the counter and the lockout immediately.
+
+If an operator genuinely has to intervene (e.g. the mail transport is down and nobody can reset),
+the state is three columns on `users` and clearing them is enough:
+```sql
+UPDATE users SET failed_login_attempts = 0, lockout_expires_at = NULL, last_failed_login_at = NULL
+ WHERE email = 'someone@example.com';
+```
+
 ### Failed deliveries spike
 - Check DLQ: Navigate to UI → Failed Messages
 - Bulk retry from UI
 - Check endpoint availability
+
+### Failed forwards spike (incoming direction)
+`incoming_forward_dlq_depth` is the alertable gauge; it drops as the backlog is worked through.
+- Navigate to UI → Failed Forwards, or `GET /api/v1/projects/{projectId}/incoming-dlq`
+- Retry one or several from there. A retry re-forwards to the destination that failed and to
+  nothing else, on a fresh retry ladder. Do **not** use the Time Machine's replay for this: it
+  fans the incoming event out to *every* enabled destination, including the ones that already
+  received it.
+- Check destination availability, and that the destination is still enabled — a disabled
+  destination fails its forwards terminally rather than retrying them.
 
 ## Monitoring
 
@@ -101,25 +139,26 @@ Metrics (Prometheus): `/actuator/prometheus` — on port **8082** for the API,
 **8081** for the worker (a separate `management.server.port` from the main app
 port, so Prometheus can scrape without a JWT/API-key — the app's main-port
 `/actuator/**` still requires one). See `monitoring/README.md` "Metrics-scrape
-auth" for the full rationale and the one place this isn't fixed yet
-(Kubernetes/Helm's `ServiceMonitor` for the API still scrapes the authenticated
-main port and 401s — tracked below, not yet done).
+auth" for the full rationale. The Helm chart splits the port the same way, and
+its `ServiceMonitor` scrapes the management port by name.
 
 Alerting: `make monitoring-up` also starts Alertmanager (`:9093`), which routes
 the 14 rules in `deploy/prometheus/alerts.yml` to Slack/webhook/email via the
 `ALERTMANAGER_*` env vars (`.env.dist`). See `monitoring/README.md` "Alerting".
 
-**Kubernetes gap (open):** `deploy/helm/hookflow/templates/servicemonitor.yaml`
-scrapes the API's `/actuator/prometheus` on its main authenticated port — that
-scrape 401s today. Fixing it means adding a management port to
-`api-deployment.yaml` / `api-service.yaml` / `servicemonitor.yaml` /
-`values.yaml` and re-pointing the liveness/readiness probes, which needs a real
-cluster to validate before shipping; the app itself already supports it via the
-`MANAGEMENT_PORT`/`MANAGEMENT_ADDRESS` env vars (same mechanism the Compose
-path uses), the chart templates just don't set them yet. The worker's
-ServiceMonitor is unaffected (worker has no auth on its actuator at all) but
-was separately broken by `MANAGEMENT_ADDRESS` defaulting to `127.0.0.1` —
-since fixed (default is now `0.0.0.0`; not published to any host port).
+**Kubernetes (closed):** the chart sets `MANAGEMENT_PORT` on both deployments
+(8082 for the API, 8081 for the worker), exposes it as a named `management`
+port on the container and the Service, points the `ServiceMonitor` and the API's
+probes at it, and opens it in the NetworkPolicy. Before that, every scrape in
+Kubernetes returned 401 and the `PrometheusRule` alerts fired on no data — while
+`helm-lint` stayed green, because nothing in CI ever applied the chart. The
+`helm-kind-smoke` job does now, and asserts a 200 on both management ports and a
+non-200 on the API's traffic port.
+
+The worker was separately broken by `MANAGEMENT_ADDRESS` defaulting to
+`127.0.0.1`, which left its actuator answering nothing outside the pod —
+kubelet probes included. The chart sets it to `0.0.0.0`; the port is published
+to no host.
 
 ## Backup & Restore
 
@@ -230,6 +269,8 @@ Production must have:
 - [ ] `SWAGGER_ENABLED=false`
 - [ ] `DB_SSL_MODE=require`
 - [ ] TLS termination at ingress/load balancer
+- [ ] `AUTH_BCRYPT_STRENGTH` left at 12 (lower it only if a login is measurably slow on your hardware)
+- [ ] `AUTH_LOCKOUT_ENABLED=true` unless something in front of the API already bounds attempts per account
 
 ## Environment Variables
 
@@ -242,6 +283,11 @@ Key settings:
 ## Detailed Documentation
 
 - **[Self-Hosted Deployment Guide](./SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, Helm install, TLS, monitoring
+- **[Architecture](./ARCHITECTURE.md)** — the two pipelines, the attempt lifecycle, consistency and failure modes
+- **[Observability](./guides/observability.md)** — every metric worth alerting on, and the three to start with
+- **[Access control and tenancy](./guides/rbac-and-tenancy.md)** — roles, scopes, and what `@TenantId` does and does not cover
+- **[Data retention and export](./guides/data-retention.md)** — what is kept and for how long, and how to bound the two largest tables
+- **[Static egress IP](./guides/static-egress-ip.md)** — giving customers a fixed address to allowlist
 
 ## Support
 

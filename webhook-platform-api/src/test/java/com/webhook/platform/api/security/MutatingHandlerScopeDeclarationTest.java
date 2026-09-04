@@ -75,6 +75,15 @@ class MutatingHandlerScopeDeclarationTest {
             "DeviceAuthController.initiateDeviceAuth",
             "DeviceAuthController.pollDeviceToken",
             "DeviceAuthController.approveDeviceCode",
+            "DeviceAuthController.denyDeviceCode",
+
+            // Act on the caller's own sign-ins rather than on organization data, and are gated
+            // on auth.requireJwt(), which rejects an API key outright — strictly stronger than
+            // any scope a key could hold. An API key has no session to revoke and no membership
+            // to switch between, so a scope is not the question these ask.
+            "AuthController.revokeSession",
+            "AuthController.revokeAllSessions",
+            "AuthController.switchOrganization",
 
             // Owner-level org and billing operations: gated on requireOwnerAccess(), which is
             // strictly stronger than any API-key scope (API keys never hold OWNER).
@@ -88,7 +97,14 @@ class MutatingHandlerScopeDeclarationTest {
             "MemberController.addMember",
             "MemberController.changeMemberRole",
             "MemberController.removeMember",
+            "MemberController.reissueInvite",
             "MemberController.acceptInvite",
+            // Same reason, and stronger than the three above: suspend and reinstate declare
+            // @RequireAccess(OWNER), which the interceptor enforces for every caller. An API key
+            // holds MembershipRole.API_KEY and so is refused whatever its scope — a scope
+            // annotation could only weaken that.
+            "MemberController.suspendMember",
+            "MemberController.reinstateMember",
 
             // Unauthenticated by design — whitelisted public paths in SecurityConfig.
             "BillingController.handleWebhook",

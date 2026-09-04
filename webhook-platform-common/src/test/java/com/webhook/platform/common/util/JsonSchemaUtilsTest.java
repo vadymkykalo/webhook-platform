@@ -166,6 +166,85 @@ class JsonSchemaUtilsTest {
         assertTrue(parsed.has("breaking"));
     }
 
+    // ── diff: which side of a change was required ──
+
+    @Test
+    void diff_addedRequiredField_isMarkedRequired() throws Exception {
+        String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
+        String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
+        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+
+        assertEquals(1, diff.added().size());
+        assertTrue(diff.added().get(0).required());
+        assertTrue(diff.breaking());
+    }
+
+    @Test
+    void diff_removedRequiredField_isMarkedRequired() throws Exception {
+        String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
+        String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
+        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+
+        assertEquals(1, diff.removed().size());
+        assertTrue(diff.removed().get(0).required(),
+                "removed fields carried required=false unconditionally, so nothing could tell a "
+                        + "dropped optional field from a dropped required one");
+    }
+
+    @Test
+    void diff_removedOptionalField_isNotMarkedRequired() throws Exception {
+        String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"nickname\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
+        String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
+        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+
+        assertEquals(1, diff.removed().size());
+        assertFalse(diff.removed().get(0).required());
+    }
+
+    @Test
+    void diff_requiredIsReadFromTheOwningObject_notTheRoot() throws Exception {
+        // "id" is required inside `user`, and the root requires nothing of that name. Reading
+        // the root's required array put required=false on it.
+        String old = "{\"type\":\"object\",\"properties\":{\"user\":{\"type\":\"object\","
+                + "\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}}}";
+        String nw = "{\"type\":\"object\",\"properties\":{\"user\":{\"type\":\"object\","
+                + "\"properties\":{\"name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"}},"
+                + "\"required\":[\"name\",\"id\"]}}}";
+        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+
+        assertEquals(1, diff.added().size());
+        assertEquals("$.user.id", diff.added().get(0).path());
+        assertTrue(diff.added().get(0).required());
+    }
+
+    @Test
+    void diff_aFieldThatBecameRequiredCountsAsAddingARequirement() throws Exception {
+        String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
+        String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
+        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+
+        assertEquals(1, diff.tightened().size());
+        assertEquals("$.email", diff.tightened().get(0).path());
+        assertTrue(diff.breaking());
+    }
+
+    @Test
+    void diff_aFieldThatBecameOptionalIsNotBreakingOnItsOwn() throws Exception {
+        String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
+        String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
+        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+
+        assertEquals(1, diff.relaxed().size());
+        assertEquals("$.email", diff.relaxed().get(0).path());
+    }
+
     // ── validate ──
 
     @Test

@@ -5,6 +5,135 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.10.0] - 2026-09-04
+
+Fifty-five commits since 2.9.1. The theme, if there is one, is closing the gap between what the
+platform could already do and what a user could actually reach or see — several features in here
+were fully implemented on the backend and inert, unreachable, or invisible.
+
+### Added
+
+**Authentication.** Five gaps, closed together because they are the same question asked five
+ways: who is signed in to this account, with what, and how do I take it back.
+
+- **Active sessions, and per-session revoke.** Refresh tokens are self-contained JWTs, so nothing
+  anywhere knew how many were outstanding: a user could not see that a laptop they no longer own
+  was still signed in, and could not see a CLI device-code grant at all — the credential most
+  likely to outlive the machine it was issued to. Settings now lists every live session with its
+  client, address and last activity, and ends any one of them. Revoking reaches the access token
+  too, via a `sid` claim the JWT filter checks, rather than leaving the device authenticated for
+  the remaining quarter of an hour. "Sign out everywhere" reuses the per-user revocation epoch
+  that already existed, which is one Redis write for every token at once.
+- **API key rotation with a grace window.** `POST /api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate`
+  issues a replacement and gives the outgoing key an expiry — 24 hours by default, `0` to cut it
+  off immediately after a suspected leak. Both keys authenticate for the window, so a rollover is
+  no longer a create-then-revoke race the customer has to time by hand.
+- **An organization switcher.** `GET /api/v1/orgs` has always returned every organization a user
+  belongs to and nothing ever called it, because login minted a token for the oldest membership
+  and refresh minted the same one again — so accepting an invite to a second organization changed
+  nothing you could see. `POST /api/v1/auth/switch-organization` re-issues an access token for a
+  membership the caller genuinely holds, with the role from *that* row. The choice is stored on
+  the session, so a refresh fifteen minutes later does not undo it.
+- **Account lockout on consecutive failed sign-ins.** Progressive — a minute at the fifth failure,
+  doubling, capped at fifteen — and every lockout lapses on its own, with a password reset
+  clearing it outright. Configured through `AUTH_LOCKOUT_*`.
+- **Suspending a member**, for the cases where deleting them is too much.
+- **A CLI login you can refuse**, and a tunnel status the compiler checks.
+
+**Incoming direction.** The side of the platform that had been getting less attention.
+
+- **A DLQ you can browse, retry and purge**, matching what the outgoing direction already had.
+- **Twilio signature verification**, and `CUSTOM` stops pretending to be a provider.
+- **What a Forward actually sent** is now visible, and a new endpoint can pick its signature
+  scheme at creation.
+
+**Reliability and limits.**
+
+- **Alert rules are evaluated**, so the rules users create can fire. Every `AlertType` value was
+  unreferenced outside its own enum: rules could be created, and none of them ever did anything.
+- **A delay node suspends its execution** instead of sleeping on a thread.
+- **Per-organization fairness in the worker**, so one organization can no longer take all of it.
+- **The compatibility mode the schema registry stored and never once read** is now enforced.
+- **Standard Webhooks** was shipped everywhere except where a user could reach it; it is now
+  selectable in the UI.
+- **Four things the backend could already do and the UI could not ask for.**
+- **An onboarding that builds the thing** instead of describing it.
+
+### Changed
+
+- **BCrypt work factor is now 12 and configurable via `AUTH_BCRYPT_STRENGTH`.** Both services that
+  hash a password called `new BCryptPasswordEncoder()`, which is the library's 2010 default of 10.
+  Raising it is not a migration: BCrypt writes the cost into each hash, so every stored password
+  keeps verifying and is rewritten at the new cost the next time it changes. Measured cost is
+  about 160 ms per sign-in.
+- **MinIO is removed.** It was in the Compose file and nothing consumed it.
+- **Seven configuration knobs an operator could turn that changed nothing** now either work or are
+  gone.
+- **Dead UI code deleted** — what nothing called.
+
+### Fixed
+
+- **Four ways a Forward was lost, unfenced or unrecorded.** The incoming direction's claim
+  handling did not match the outgoing direction's, which is precisely the asymmetry
+  `AttemptRunner`'s invariants exist to prevent.
+- **A broken transformation fails the attempt** instead of delivering a payload with holes in it.
+- **A circuit breaker that cannot count says so** — Redis being unreachable is now visible as
+  `circuit_breaker_degraded_total` rather than silently failing open.
+- **The whole incoming direction was free and unbounded**, and events and deliveries are now
+  bounded without requiring billing to be enabled.
+- **A quota counter that stayed short for the rest of the month.**
+- **The billing states nothing could reach**, and one nobody synced.
+- **A WARN schema policy that warned nobody who could act on it.**
+- **The SSRF window on the one client a user aims** — alert webhooks — is closed.
+- **Masking rules apply on the screens people actually debug on.**
+- **The PII card rule missed the shape every payment provider sends**, and the PII preview crashed
+  the page it was added to.
+- **Endpoint verification survived the edit that invalidates it.**
+- **A member could not change their own password**, and an invite could not be delivered.
+- **An unreachable SMTP relay no longer reports the whole API as down.** The aggregate health
+  indicator read DOWN with `EMAIL_ENABLED=false`.
+- **A template-default install could not log in.**
+- **One rule for what an omitted field means on update**, applied consistently.
+- **Six rail links that looked broken because they went nowhere**, and the chrome a table gets
+  before it has anything to show.
+- **The Helm chart never came up, and CI could not have noticed** — plus the kind smoke job's
+  Kafka pointed its quorum at a Service port that does not exist.
+- **`make dev-ui` built one image and started another.**
+
+### Documentation
+
+Substantially expanded, and split by audience: the repository holds what you read while
+evaluating or operating Hookflow, the dashboard's `/docs` holds what you read with the product
+open. Nothing is written in both places.
+
+- **`docs/ARCHITECTURE.md` rewritten.** It was four diagrams and their captions. It is now
+  fourteen diagrams — the data model, the Claim and its fence token, the admission order, the
+  delivery state machine, ordering and gaps, tenancy, the production topology — plus prose on the
+  consistency model, partitioning and failure modes that previously existed only in people's
+  heads.
+- **Nine new guides.** In the repository: observability, access control and tenancy, data
+  retention and export, static egress IP, and a comparison against Svix, Hookdeck and Convoy with
+  the gaps included. In the app: transformations, ordering, endpoint security, PII masking, and
+  alerts and incidents — all in both English and Ukrainian.
+- **A migration guide** for Svix, Hookdeck and Convoy, which documents something that was true and
+  unstated: Hookflow implements Standard Webhooks exactly, so a receiver already using a Svix
+  library keeps working with nothing but a new secret and URL.
+- **`OPERATIONS.md` known limitations** are their own section rather than buried in the backup
+  runbook — including that a Postgres restore does not reconcile Kafka and Redis.
+- **The README** gained a capability table, a table of contents and a documentation index while
+  getting shorter per section, by cutting what it said twice.
+- **`ROADMAP.md`** no longer lists the organization switcher as missing. It shipped.
+
+### Build
+
+- **Three CI tool downloads retry**, and land on disk before being unpacked. A retry cannot rescue
+  a `curl | tar` pipe: by the time curl starts over, tar has already read a truncated stream. The
+  Helm job failed exactly that way on a clean tree.
+- **A test asserting every documentation section renders**, because a guide is registered in two
+  files and nothing tied them together — a nav link that opens an empty page produced no error.
+
 ## [2.9.1] - 2026-08-29
 
 The other half of the API-reference fix that shipped in 2.9.0.
@@ -766,7 +895,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...v2.8.0

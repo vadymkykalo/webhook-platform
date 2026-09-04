@@ -3,6 +3,7 @@ package com.webhook.platform.api.service.verification;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,6 +12,12 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class WebhookVerifierFactory {
+
+    private final String ingressBaseUrl;
+
+    public WebhookVerifierFactory(@Value("${webhook.ingress-base-url:}") String ingressBaseUrl) {
+        this.ingressBaseUrl = ingressBaseUrl;
+    }
 
     /**
      * Returns a verification strategy for the given source, or null if verification is disabled.
@@ -22,7 +29,7 @@ public class WebhookVerifierFactory {
 
         if (source.getVerificationMode() == VerificationMode.HMAC_GENERIC) {
             return new GenericHmacVerifier(
-                    source.getHmacHeaderName(), 
+                    source.getHmacHeaderName(),
                     source.getHmacSignaturePrefix());
         }
 
@@ -45,12 +52,13 @@ public class WebhookVerifierFactory {
     /**
      * Whether {@code PROVIDER} mode can actually verify this provider.
      *
-     * <p>{@code ProviderType} carries names no verifier is written for — {@code GENERIC},
-     * {@code TWILIO}, {@code CUSTOM}. Selecting one of them with {@code PROVIDER} mode used
-     * to save happily and then throw {@link IllegalStateException} at ingress, so the source
-     * looked configured and the failure arrived once the provider was already sending.
-     * {@code IncomingSourceService} asks this at write time instead; the two cannot disagree
-     * because the answer comes from the same switch that builds the verifier.
+     * <p>{@code GENERIC} is the one name that answers no on purpose: it is the label for a
+     * provider Hookflow has no preset for, and the way to verify one of those is
+     * {@code HMAC_GENERIC} with the header and prefix that provider signs in. Selecting it with
+     * {@code PROVIDER} mode used to save happily and then throw {@link IllegalStateException} at
+     * ingress, so the source looked configured and the failure arrived once the provider was
+     * already sending. {@code IncomingSourceService} asks this at write time instead; the two
+     * cannot disagree because the answer comes from the same switch that builds the verifier.
      */
     public boolean supportsProviderVerification(ProviderType providerType) {
         return getProviderVerifier(providerType) != null;
@@ -60,6 +68,8 @@ public class WebhookVerifierFactory {
         if (providerType == null) {
             return null;
         }
+        // Exhaustive on purpose — no `default` arm. A new ProviderType is then a compile error
+        // here rather than a source that saves in PROVIDER mode and cannot verify a thing.
         return switch (providerType) {
             case GITHUB -> new GitHubVerifier();
             // Not GitHubVerifier: GitLab sends a plain shared token in X-Gitlab-Token and
@@ -68,7 +78,8 @@ public class WebhookVerifierFactory {
             case STRIPE -> new StripeVerifier();
             case SLACK -> new SlackVerifier();
             case SHOPIFY -> new ShopifyVerifier();
-            default -> null;
+            case TWILIO -> new TwilioVerifier(ingressBaseUrl);
+            case GENERIC -> null;
         };
     }
 }

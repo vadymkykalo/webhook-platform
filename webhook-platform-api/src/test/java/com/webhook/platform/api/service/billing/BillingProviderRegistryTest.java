@@ -19,7 +19,7 @@ class BillingProviderRegistryTest {
         stripe = stubProvider("stripe", "Stripe",
                 EnumSet.of(BillingCapability.MANAGED_SUBSCRIPTIONS, BillingCapability.CUSTOMERS));
         wayforpay = stubProvider("wayforpay", "WayForPay",
-                EnumSet.of(BillingCapability.MERCHANT_RECURRING, BillingCapability.REFUNDS));
+                EnumSet.of(BillingCapability.MERCHANT_RECURRING));
         noop = new NoOpBillingProvider();
         registry = new BillingProviderRegistry(List.of(stripe, wayforpay, noop), "stripe");
     }

@@ -5,7 +5,6 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -51,6 +50,14 @@ public class IncomingDestinationRequest {
     @Size(max = 4096, message = "Payload transform expression must be at most 4096 characters")
     private String payloadTransform;
 
-    @Schema(description = "ID of a reusable transformation template to apply (overrides payloadTransform if set)")
-    private UUID transformationId;
+    /**
+     * A string rather than a {@code UUID} so that {@code ""} can mean "detach", the way a blank
+     * {@code payloadTransform} clears that field. Jackson maps both an absent property and an
+     * explicit null to the same value, so a typed UUID left no way to express the difference and
+     * a destination that acquired a transformation could never be freed of one.
+     */
+    @Schema(description = "ID of a reusable transformation template to apply (overrides "
+            + "payloadTransform if set). Empty string detaches the destination from its template.",
+            format = "uuid")
+    private String transformationId;
 }

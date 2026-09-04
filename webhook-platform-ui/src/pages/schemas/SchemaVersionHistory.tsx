@@ -2,16 +2,16 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDownCircle, ArrowUpCircle, Check, ChevronRight, Copy, GitCompareArrows,
-  History, Info, Loader2, Plus, Trash2,
+  History, Info, Loader2, Pencil, Plus, Trash2,
 } from 'lucide-react';
 import {
   useSchemaVersions, useCreateSchemaVersion, usePromoteSchema, useDeprecateSchema,
-  useSchemaChanges, useProjectSchemaChanges, useDeleteEventType,
+  useSchemaChanges, useProjectSchemaChanges, useDeleteEventType, useUpdateEventType,
 } from '../../api/queries';
 import { showApiError, showSuccess } from '../../lib/toast';
 import { formatDate } from '../../lib/date';
 import type {
-  EventTypeCatalogResponse, EventSchemaVersionResponse, SchemaChangeResponse,
+  CompatibilityMode, EventTypeCatalogResponse, EventSchemaVersionResponse, SchemaChangeResponse,
 } from '../../api/schemas.api';
 import EmptyState, { ErrorState } from '../../components/EmptyState';
 import { SkeletonRows } from '../../components/PageSkeleton';
@@ -20,6 +20,10 @@ import JsonEditor from '../../components/JsonEditor';
 import { Button, buttonVariants } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Select } from '../../components/ui/select';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '../../components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -50,10 +54,16 @@ function statusLabelKey(status: string): string {
   }
 }
 
+const COMPATIBILITY_MODES: CompatibilityMode[] = ['NONE', 'BACKWARD', 'FORWARD', 'FULL'];
+
 interface ChangeSummary {
   added: { path: string; type?: string; required?: boolean }[];
   removed: { path: string }[];
   changed: { path: string; oldType?: string; type?: string }[];
+  /** Optional before, required now — the change BACKWARD refuses. */
+  tightened: { path: string }[];
+  /** Required before, optional now — the change FORWARD refuses. */
+  relaxed: { path: string }[];
 }
 
 function parseChangeSummary(summary: string): ChangeSummary {
@@ -63,9 +73,12 @@ function parseChangeSummary(summary: string): ChangeSummary {
       added: parsed.added || [],
       removed: parsed.removed || [],
       changed: parsed.changed || [],
+      // Changes recorded before these two buckets existed have neither key.
+      tightened: parsed.tightened || [],
+      relaxed: parsed.relaxed || [],
     };
   } catch {
-    return { added: [], removed: [], changed: [] };
+    return { added: [], removed: [], changed: [], tightened: [], relaxed: [] };
   }
 }
 
@@ -77,6 +90,8 @@ function ChangeTally({ summary }: { summary: ChangeSummary }) {
       {summary.added.length > 0 && <span>{`+${summary.added.length} ${t('schemas.board.added')}`}</span>}
       {summary.removed.length > 0 && <span>{`−${summary.removed.length} ${t('schemas.board.removed')}`}</span>}
       {summary.changed.length > 0 && <span>{`~${summary.changed.length} ${t('schemas.board.changed')}`}</span>}
+      {summary.tightened.length > 0 && <span>{`!${summary.tightened.length} ${t('schemas.board.tightened')}`}</span>}
+      {summary.relaxed.length > 0 && <span>{`?${summary.relaxed.length} ${t('schemas.board.relaxed')}`}</span>}
     </div>
   );
 }
@@ -86,7 +101,9 @@ function FieldList({ summary }: { summary: ChangeSummary }) {
     <div className="space-y-1.5">
       {[...summary.added.map((f) => ({ mark: '+', path: f.path, note: f.type })),
         ...summary.removed.map((f) => ({ mark: '−', path: f.path, note: undefined })),
-        ...summary.changed.map((f) => ({ mark: '~', path: f.path, note: `${f.oldType} → ${f.type}` }))]
+        ...summary.changed.map((f) => ({ mark: '~', path: f.path, note: `${f.oldType} → ${f.type}` })),
+        ...summary.tightened.map((f) => ({ mark: '!', path: f.path, note: undefined })),
+        ...summary.relaxed.map((f) => ({ mark: '?', path: f.path, note: undefined }))]
         .map((entry, i) => (
           <div key={`${entry.path}-${i}`} className="flex items-baseline gap-2 font-mono text-[11px]">
             <span className="w-3 flex-shrink-0 text-muted-foreground">{entry.mark}</span>
@@ -109,6 +126,30 @@ export default function SchemaVersionHistory({
   const [tab, setTab] = useState<'versions' | 'changes'>('versions');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteMutation = useDeleteEventType(projectId);
+  const updateMutation = useUpdateEventType(projectId);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(eventType.name);
+  const [editDesc, setEditDesc] = useState(eventType.description ?? '');
+
+  const openEdit = () => {
+    setEditName(eventType.name);
+    setEditDesc(eventType.description ?? '');
+    setEditing(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editName.trim()) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: eventType.id,
+        data: { name: editName.trim(), description: editDesc.trim() || undefined },
+      });
+      setEditing(false);
+      showSuccess(t('schemas.editTypeSaved'));
+    } catch (err) {
+      showApiError(err, 'schemas.editTypeFailed');
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -142,16 +183,28 @@ export default function SchemaVersionHistory({
               )}
             </div>
           </div>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-muted-foreground hover:text-halt"
-            onClick={() => setConfirmDelete(true)}
-            title={t('schemas.deleteType')}
-            aria-label={t('schemas.deleteType')}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={openEdit}
+              title={t('schemas.editType')}
+              aria-label={t('schemas.editType')}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground hover:text-halt"
+              onClick={() => setConfirmDelete(true)}
+              title={t('schemas.deleteType')}
+              aria-label={t('schemas.deleteType')}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </header>
 
         <div className="flex gap-1 border-t border-rail px-3">
@@ -163,6 +216,40 @@ export default function SchemaVersionHistory({
       {tab === 'versions'
         ? <VersionList projectId={projectId} eventType={eventType} />
         : <ChangeList projectId={projectId} eventType={eventType} />}
+
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('schemas.editType')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="event-type-name">{t('schemas.typeName')}</Label>
+              <Input
+                id="event-type-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="event-type-description">{t('schemas.typeDescription')}</Label>
+              <Input
+                id="event-type-description"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleUpdate} disabled={!editName.trim() || updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -219,6 +306,7 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
   const [showUpload, setShowUpload] = useState(false);
   const [schemaInput, setSchemaInput] = useState('');
   const [versionDesc, setVersionDesc] = useState('');
+  const [compatibility, setCompatibility] = useState<CompatibilityMode | ''>('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -230,9 +318,16 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
       return;
     }
     try {
-      await createMutation.mutateAsync({ schemaJson: schemaInput, description: versionDesc.trim() || undefined });
+      // Left blank the field is omitted, and the server inherits the previous version's mode.
+      // Sending NONE explicitly is a different thing: it drops the promise the type was under.
+      await createMutation.mutateAsync({
+        schemaJson: schemaInput,
+        description: versionDesc.trim() || undefined,
+        compatibilityMode: compatibility || undefined,
+      });
       setSchemaInput('');
       setVersionDesc('');
+      setCompatibility('');
       setShowUpload(false);
       showSuccess(t('schemas.versionCreated'));
     } catch (err: any) {
@@ -275,15 +370,30 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
               placeholder='{"type": "object", "properties": {}}'
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sv-note" className="text-xs">{t('schemas.versionNote')}</Label>
-            <Input
-              id="sv-note"
-              value={versionDesc}
-              onChange={(e) => setVersionDesc(e.target.value)}
-              placeholder={t('schemas.versionNotePlaceholder')}
-              className="h-8 text-sm"
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sv-note" className="text-xs">{t('schemas.versionNote')}</Label>
+              <Input
+                id="sv-note"
+                value={versionDesc}
+                onChange={(e) => setVersionDesc(e.target.value)}
+                placeholder={t('schemas.versionNotePlaceholder')}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sv-compat" className="text-xs">{t('schemas.compatibility')}</Label>
+              <Select
+                id="sv-compat"
+                value={compatibility}
+                onChange={(e) => setCompatibility(e.target.value as CompatibilityMode | '')}
+                className="h-8 text-sm"
+              >
+                <option value="">{t('schemas.compatibilityInherit')}</option>
+                {COMPATIBILITY_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </Select>
+              <p className="text-[11px] text-muted-foreground">{t('schemas.compatibilityHint')}</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={handleUpload} disabled={!schemaInput.trim() || createMutation.isPending}>
@@ -335,6 +445,11 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
                     <span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
                       {v.fingerprint.slice(0, 12)}
                     </span>
+                    {v.compatibilityMode !== 'NONE' && (
+                      <span className="hidden font-mono text-[11px] text-muted-foreground md:inline">
+                        {v.compatibilityMode}
+                      </span>
+                    )}
                     <span className="ml-auto flex-shrink-0 font-mono text-[11px] text-muted-foreground">
                       {formatDate(v.createdAt)}
                     </span>

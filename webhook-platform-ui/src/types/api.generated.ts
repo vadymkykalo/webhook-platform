@@ -1056,6 +1056,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry single incoming DLQ item
+         * @description Re-forwards one abandoned forward to the destination that failed
+         */
+        post: operations["retryIncomingDlqItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk retry incoming DLQ items
+         * @description Re-forwards several abandoned forwards, each to the destination that failed
+         */
+        post: operations["retryIncomingDlqItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/incidents": {
         parameters: {
             query?: never;
@@ -1336,6 +1376,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate API key
+         * @description Issues a replacement key and puts the old one into a grace window, during which both authenticate. The replacement is shown only once. Default window is 24 hours; pass gracePeriodHours=0 to cut the old key off immediately after a suspected leak.
+         */
+        post: operations["rotateApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/alerts/rules": {
         parameters: {
             query?: never;
@@ -1418,6 +1478,66 @@ export interface paths {
          * @description Invites a user to the organization
          */
         post: operations["addMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{orgId}/members/{userId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend member
+         * @description Suspends a member: the membership and its role are kept, the member is refused access, and their current sessions end immediately
+         */
+        post: operations["suspendMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{orgId}/members/{userId}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reinstate member
+         * @description Lifts a suspension, restoring the member's access in the role they kept
+         */
+        post: operations["reinstateMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{orgId}/members/{userId}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-issue invite
+         * @description Issues a fresh invite token for a member whose invite is still pending, replacing the previous one and restarting its 48-hour expiry. The accept-invite link is returned so an owner can pass it on when email delivery is not configured.
+         */
+        post: operations["reissueInvite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1604,6 +1724,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/switch-organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch organization
+         * @description Re-issues an access token scoped to another organization the caller belongs to. The refresh token is untouched and no other session is affected; the new token's role comes from the membership in the target organization, not from the token being replaced.
+         */
+        post: operations["switchOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out everywhere
+         * @description Ends every session for the authenticated user, including the one making the call.
+         */
+        post: operations["revokeAllSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/reset-password": {
         parameters: {
             query?: never;
@@ -1758,6 +1918,26 @@ export interface paths {
          * @description CLI polls this endpoint with device_code until the user approves. Returns 202 while pending, 200 with tokens when approved.
          */
         post: operations["pollDeviceToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/device/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny device code
+         * @description Called by the authenticated user in the browser to refuse a device login request they did not start. The waiting CLI stops with 403 on its next poll instead of holding the code open until it expires.
+         */
+        post: operations["denyDeviceCode"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2216,6 +2396,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/incoming-dlq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incoming DLQ items
+         * @description Returns paginated list of abandoned forwards in the incoming DLQ
+         */
+        get: operations["listIncomingDlqItems"];
+        put?: never;
+        post?: never;
+        /**
+         * Purge all incoming DLQ items
+         * @description Permanently deletes every abandoned forward in the project's incoming DLQ
+         */
+        delete: operations["purgeIncomingDlq"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get incoming DLQ item details
+         * @description Returns details of a single abandoned forward
+         */
+        get: operations["getIncomingDlqItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get incoming DLQ stats
+         * @description Returns incoming DLQ statistics for the project
+         */
+        get: operations["getIncomingDlqStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/incidents/open-count": {
         parameters: {
             query?: never;
@@ -2660,6 +2904,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active sessions
+         * @description Returns every live sign-in for the authenticated user — browser sessions and CLI device-code grants alike — with the session making the request flagged as current. No token material is returned.
+         */
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -2795,6 +3059,26 @@ export interface paths {
          * @description Permanently revokes an API key
          */
         delete: operations["revokeApiKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a session
+         * @description Signs one device out. The session's refresh token stops working and so does the access token it already issued, rather than surviving until its own expiry.
+         */
+        delete: operations["revokeSession"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3128,7 +3412,7 @@ export interface components {
             payloadTransform?: string;
             /**
              * Format: uuid
-             * @description ID of a reusable transformation template to apply (overrides payloadTransform if set)
+             * @description ID of a reusable transformation template to apply (overrides payloadTransform if set). Empty string detaches the destination from its template.
              */
             transformationId?: string;
         };
@@ -3174,7 +3458,7 @@ export interface components {
              * @example GITHUB
              * @enum {string}
              */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "CUSTOM";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
             /**
              * @description Source status
              * @enum {string}
@@ -3212,7 +3496,7 @@ export interface components {
             name?: string;
             slug?: string;
             /** @enum {string} */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "CUSTOM";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED";
             ingressPathToken?: string;
@@ -3274,7 +3558,10 @@ export interface components {
             description?: string;
             secret?: string;
             enabled?: boolean;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Per-endpoint delivery throttle. 0 removes the limit.
+             */
             rateLimitPerSecond?: number;
             allowedSourceIps?: string;
             /** @enum {string} */
@@ -3474,7 +3761,7 @@ export interface components {
             nodeId?: string;
             nodeType?: string;
             /** @enum {string} */
-            status?: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "SKIPPED";
+            status?: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "SKIPPED" | "WAITING";
             inputData?: unknown;
             outputData?: unknown;
             errorMessage?: string;
@@ -3495,7 +3782,7 @@ export interface components {
             /** Format: uuid */
             triggerEventId?: string;
             /** @enum {string} */
-            status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+            status?: "RUNNING" | "WAITING" | "COMPLETED" | "FAILED" | "CANCELLED";
             triggerData?: unknown;
             /** Format: date-time */
             startedAt?: string;
@@ -3603,7 +3890,11 @@ export interface components {
         };
         EventSchemaVersionRequest: {
             schemaJson: string;
-            compatibilityMode?: string;
+            /**
+             * @description Compatibility promise checked against the previous version. Defaults to the previous version's mode, or NONE for the first version.
+             * @enum {string}
+             */
+            compatibilityMode?: "NONE" | "BACKWARD" | "FORWARD" | "FULL";
             description?: string;
         };
         EventSchemaVersionResponse: {
@@ -3616,7 +3907,8 @@ export interface components {
             schemaJson?: string;
             fingerprint?: string;
             status?: string;
-            compatibilityMode?: string;
+            /** @enum {string} */
+            compatibilityMode?: "NONE" | "BACKWARD" | "FORWARD" | "FULL";
             description?: string;
             /** Format: uuid */
             createdBy?: string;
@@ -3754,6 +4046,17 @@ export interface components {
              */
             totalForwardAttempts?: number;
         };
+        DlqActionResponse: {
+            /** Format: int32 */
+            retried?: number;
+            /** Format: int32 */
+            requested?: number;
+            /** Format: int32 */
+            purged?: number;
+        };
+        IncomingDlqRetryRequest: {
+            forwardAttemptIds: string[];
+        };
         TimelineEntryRequest: {
             /** @enum {string} */
             entryType: "FAILURE" | "RETRY" | "REPLAY" | "NOTE" | "STATUS_CHANGE";
@@ -3799,6 +4102,7 @@ export interface components {
             createdAt?: string;
             /** Format: int32 */
             deliveriesCreated?: number;
+            schemaWarnings?: string[];
         };
         VerificationResponse: {
             success?: boolean;
@@ -3822,14 +4126,6 @@ export interface components {
             clientCert: string;
             clientKey: string;
             caCert?: string;
-        };
-        DlqActionResponse: {
-            /** Format: int32 */
-            retried?: number;
-            /** Format: int32 */
-            requested?: number;
-            /** Format: int32 */
-            purged?: number;
         };
         DlqRetryRequest: {
             deliveryIds: string[];
@@ -3858,6 +4154,16 @@ export interface components {
             expiresAt?: string;
             scope?: string;
             key?: string;
+            /** Format: date-time */
+            rotatedAt?: string;
+            /** Format: uuid */
+            replacedById?: string;
+        };
+        ApiKeyRotateRequest: {
+            /** Format: int32 */
+            gracePeriodHours?: number;
+            /** Format: date-time */
+            expiresAt?: string;
         };
         AddMemberRequest: {
             /** Format: email */
@@ -3875,6 +4181,28 @@ export interface components {
             status?: "INVITED" | "ACTIVE" | "DISABLED";
             /** Format: date-time */
             createdAt?: string;
+            /** Format: date-time */
+            inviteExpiresAt?: string;
+            inviteUrl?: string;
+        };
+        EventIngestResponse: {
+            /** Format: uuid */
+            eventId?: string;
+            type?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            deliveriesCreated?: number;
+            schemaWarnings?: string[];
+        };
+        ErrorResponse: {
+            error?: string;
+            message?: string;
+            /** Format: int32 */
+            status?: number;
+            fieldErrors?: {
+                [key: string]: string;
+            };
         };
         BulkReplayRequest: {
             deliveryIds?: string[];
@@ -3906,6 +4234,15 @@ export interface components {
             providerCode?: string;
             billingInterval?: string;
         };
+        SwitchOrganizationRequest: {
+            /** Format: uuid */
+            organizationId: string;
+        };
+        AuthResponse: {
+            accessToken?: string;
+            refreshToken?: string;
+            emailVerified?: boolean;
+        };
         ResetPasswordRequest: {
             token: string;
             newPassword: string;
@@ -3916,11 +4253,6 @@ export interface components {
             password: string;
             fullName?: string;
             organizationName: string;
-        };
-        AuthResponse: {
-            accessToken?: string;
-            refreshToken?: string;
-            emailVerified?: boolean;
         };
         RefreshTokenRequest: {
             refreshToken: string;
@@ -3939,6 +4271,9 @@ export interface components {
         };
         DeviceTokenRequest: {
             deviceCode: string;
+        };
+        DeviceDenyRequest: {
+            userCode: string;
         };
         DeviceCodeResponse: {
             deviceCode?: string;
@@ -4298,6 +4633,8 @@ export interface components {
             startedAt?: string;
             /** Format: date-time */
             finishedAt?: string;
+            requestHeadersJson?: string;
+            requestBodySnippet?: string;
             /** Format: int32 */
             responseCode?: number;
             responseHeadersJson?: string;
@@ -4325,6 +4662,55 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        IncomingDlqItemResponse: {
+            /** Format: uuid */
+            forwardAttemptId?: string;
+            /** Format: uuid */
+            incomingEventId?: string;
+            /** Format: uuid */
+            destinationId?: string;
+            /** Format: uuid */
+            incomingSourceId?: string;
+            sourceName?: string;
+            destinationUrl?: string;
+            /** Format: int32 */
+            attemptNumber?: number;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: int32 */
+            responseCode?: number;
+            lastError?: string;
+            /** Format: date-time */
+            failedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PageIncomingDlqItemResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["IncomingDlqItemResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        DlqStatsResponse: {
+            /** Format: int64 */
+            totalItems?: number;
+            /** Format: int64 */
+            last24Hours?: number;
+            /** Format: int64 */
+            last7Days?: number;
         };
         PageIncidentResponse: {
             /** Format: int32 */
@@ -4439,14 +4825,6 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
-        };
-        DlqStatsResponse: {
-            /** Format: int64 */
-            totalItems?: number;
-            /** Format: int64 */
-            last24Hours?: number;
-            /** Format: int64 */
-            last7Days?: number;
         };
         PageApiKeyResponse: {
             /** Format: int32 */
@@ -4859,11 +5237,27 @@ export interface components {
             paidAt?: string;
             invoiceUrl?: string;
         };
+        SessionResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            client?: "WEB" | "CLI";
+            userAgent?: string;
+            ipAddress?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastSeenAt?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            current?: boolean;
+        };
         CurrentUserResponse: {
             user?: components["schemas"]["UserResponse"];
             organization?: components["schemas"]["OrganizationResponse"];
             /** @enum {string} */
             role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
+            emailDeliveryEnabled?: boolean;
         };
         AuditLogResponse: {
             /** Format: uuid */
@@ -6291,7 +6685,7 @@ export interface operations {
                     "*/*": components["schemas"]["IngressResponse"];
                 };
             };
-            /** @description Rate limit exceeded */
+            /** @description Rate limit or monthly event quota exceeded */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -7231,6 +7625,55 @@ export interface operations {
             };
         };
     };
+    retryIncomingDlqItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                forwardAttemptId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forward queued for retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqActionResponse"];
+                };
+            };
+        };
+    };
+    retryIncomingDlqItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncomingDlqRetryRequest"];
+            };
+        };
+        responses: {
+            /** @description Forwards queued for retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqActionResponse"];
+                };
+            };
+        };
+    };
     listIncidents: {
         parameters: {
             query?: {
@@ -7690,6 +8133,33 @@ export interface operations {
             };
         };
     };
+    rotateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                apiKeyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyRotateRequest"];
+            };
+        };
+        responses: {
+            /** @description Replacement key created; the old key is retiring */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiKeyResponse"];
+                };
+            };
+        };
+    };
     listAlertRules: {
         parameters: {
             query?: never;
@@ -7831,6 +8301,75 @@ export interface operations {
             };
         };
     };
+    suspendMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Member suspended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MemberResponse"];
+                };
+            };
+        };
+    };
+    reinstateMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Member reinstated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MemberResponse"];
+                };
+            };
+        };
+    };
+    reissueInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invite re-issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MemberResponse"];
+                };
+            };
+        };
+    };
     acceptInvite: {
         parameters: {
             query: {
@@ -7877,7 +8416,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["EventIngestResponse"];
                 };
             };
             /** @description Invalid or missing API key */
@@ -7895,7 +8434,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -8061,6 +8600,75 @@ export interface operations {
             };
             /** @description Invalid or expired token */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    switchOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Access token re-issued for the target organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Not authenticated, or no live session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Caller is not a member of that organization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+        };
+    };
+    revokeAllSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All sessions revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8347,6 +8955,35 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AuthResponse"];
                 };
+            };
+        };
+    };
+    denyDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDenyRequest"];
+            };
+        };
+        responses: {
+            /** @description Device code denied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Code not found or already used */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -9025,6 +9662,99 @@ export interface operations {
             };
         };
     };
+    listIncomingDlqItems: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                destinationId?: string;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageIncomingDlqItemResponse"];
+                };
+            };
+        };
+    };
+    purgeIncomingDlq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Incoming DLQ purged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqActionResponse"];
+                };
+            };
+        };
+    };
+    getIncomingDlqItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                forwardAttemptId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IncomingDlqItemResponse"];
+                };
+            };
+        };
+    };
+    getIncomingDlqStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqStatsResponse"];
+                };
+            };
+        };
+    };
     countOpen: {
         parameters: {
             query?: never;
@@ -9580,6 +10310,37 @@ export interface operations {
             };
         };
     };
+    listSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SessionResponse"][];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SessionResponse"][];
+                };
+            };
+        };
+    };
     getCurrentUser: {
         parameters: {
             query?: never;
@@ -9745,6 +10506,40 @@ export interface operations {
         responses: {
             /** @description API key revoked */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such session for this user */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

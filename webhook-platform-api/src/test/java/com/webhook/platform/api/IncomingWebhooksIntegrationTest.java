@@ -16,6 +16,9 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.when;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -35,6 +38,17 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     private static UUID sourceId;
     private static UUID destinationId;
     private static String ingressPathToken;
+
+    /**
+     * Every Source now has an ingress rate limit — its own or the configured default — and the
+     * limiter is fail-closed. {@code RedisRateLimiterService} is a mock here, so without this
+     * every webhook posted below would be rejected with 429 before it reached the service.
+     */
+    @BeforeEach
+    void allowIngressRateLimit() {
+        when(redisRateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt()))
+                .thenReturn(true);
+    }
 
     private String auth() {
         return "Bearer " + accessToken;

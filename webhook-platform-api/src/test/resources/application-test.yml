@@ -11,6 +11,14 @@ spring:
     enabled: true
     clean-disabled: false
 
+auth:
+  bcrypt:
+    # Minimum BCrypt cost. Production is 12; every integration test that registers a user would
+    # otherwise pay a quarter-second per hash for a property none of them are asserting -- and
+    # the one test that IS about the work factor, PasswordHashingStrengthTest, builds its own
+    # encoders rather than reading this.
+    strength: 4
+
 jwt:
   secret: test_jwt_secret_key_for_testing_webhook_platform_min_32_chars
   access-token-expiration: 900000

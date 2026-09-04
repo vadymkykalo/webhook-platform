@@ -75,6 +75,7 @@ class MutatingHandlerAccessDeclarationTest {
             "AuthController.changePassword",
             "AuthController.updateProfile",
             "DeviceAuthController.approveDeviceCode",
+            "DeviceAuthController.denyDeviceCode",
             "MemberController.acceptInvite",
 
             // Org-level membership management, gated on requireJwt() plus the service's own
@@ -83,6 +84,7 @@ class MutatingHandlerAccessDeclarationTest {
             "MemberController.addMember",
             "MemberController.changeMemberRole",
             "MemberController.removeMember",
+            "MemberController.reissueInvite",
 
             // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
             // in SecurityConfig. A platform admin holds no membership role, so the interceptor

@@ -1,18 +1,15 @@
 package com.webhook.platform.api.service;
 
-import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
@@ -41,7 +38,6 @@ public class IncomingDestinationService {
 
     private final IncomingDestinationRepository destinationRepository;
     private final IncomingSourceRepository sourceRepository;
-    private final ProjectRepository projectRepository;
     private final TransformationRepository transformationRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
@@ -50,32 +46,52 @@ public class IncomingDestinationService {
     public IncomingDestinationService(
             IncomingDestinationRepository destinationRepository,
             IncomingSourceRepository sourceRepository,
-            ProjectRepository projectRepository,
             TransformationRepository transformationRepository,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.destinationRepository = destinationRepository;
         this.sourceRepository = sourceRepository;
-        this.projectRepository = projectRepository;
         this.transformationRepository = transformationRepository;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
     }
 
-    private void validateSourceOwnership(UUID sourceId) {
-        UUID organizationId = TenantContext.require();
-        IncomingSource source = sourceRepository.findById(sourceId)
+    /**
+     * Turns "no such source here" into a 404, and hands back the row.
+     *
+     * <p>{@code IncomingSource} carries {@code @TenantId}, so this lookup only sees sources inside
+     * the caller's organization: a foreign source id is indistinguishable from a missing one,
+     * which is intended.
+     *
+     * <p>It was called {@code validateSourceOwnership}, and it bound a
+     * {@code TenantContext.require()} organization id and the source's {@code Project} and
+     * compared neither — a name promising a check its body did not perform, over an isolation
+     * guarantee that in fact comes from Hibernate. The isolation was real; the reassurance was
+     * not, and a reader looking for where ownership is enforced found a method that looked like
+     * the answer.
+     */
+    private IncomingSource requireSource(UUID sourceId) {
+        return sourceRepository.findById(sourceId)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        Project project = projectRepository.findById(source.getProjectId())
-                .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    private UUID resolveProjectIdForSource(UUID sourceId) {
-        IncomingSource source = sourceRepository.findById(sourceId)
-                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        return source.getProjectId();
+    /**
+     * The request carries this as a string so that {@code ""} can mean "detach", the way a blank
+     * {@code payloadTransform} does. A UUID field could not: Jackson maps both an absent property
+     * and an explicit empty one to null, so the two would be the same request.
+     */
+    private static UUID parseTransformationId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("transformationId must be a UUID, or empty to "
+                    + "detach this destination from its transformation");
+        }
     }
 
     private void validateTransformationBelongsToProject(UUID transformationId, UUID projectId) {
@@ -89,10 +105,11 @@ public class IncomingDestinationService {
     @Auditable(action = AuditAction.CREATE, resourceType = "IncomingDestination")
     @Transactional
     public IncomingDestinationResponse createDestination(UUID sourceId, IncomingDestinationRequest request) {
-        validateSourceOwnership(sourceId);
+        IncomingSource source = requireSource(sourceId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
-        if (request.getTransformationId() != null) {
-            validateTransformationBelongsToProject(request.getTransformationId(), resolveProjectIdForSource(sourceId));
+        UUID transformationId = parseTransformationId(request.getTransformationId());
+        if (transformationId != null) {
+            validateTransformationBelongsToProject(transformationId, source.getProjectId());
         }
 
         // Same rule as the outgoing side: a malformed ladder is rejected where it is written,
@@ -114,7 +131,7 @@ public class IncomingDestinationService {
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays()
                         : RetryLadderDefaults.INCOMING_DELAYS)
                 .payloadTransform(request.getPayloadTransform())
-                .transformationId(request.getTransformationId())
+                .transformationId(transformationId)
                 .build();
 
         // Encrypt auth config if provided
@@ -133,12 +150,12 @@ public class IncomingDestinationService {
     public IncomingDestinationResponse getDestination(UUID id) {
         IncomingDestination destination = destinationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        validateSourceOwnership(destination.getIncomingSourceId());
+        requireSource(destination.getIncomingSourceId());
         return mapToResponse(destination);
     }
 
     public Page<IncomingDestinationResponse> listDestinations(UUID sourceId, Pageable pageable) {
-        validateSourceOwnership(sourceId);
+        requireSource(sourceId);
         Page<IncomingDestination> page = destinationRepository.findByIncomingSourceId(sourceId, pageable);
 
         Set<UUID> transformationIds = page.getContent().stream()
@@ -157,7 +174,7 @@ public class IncomingDestinationService {
     public IncomingDestinationResponse updateDestination(UUID id, IncomingDestinationRequest request) {
         IncomingDestination destination = destinationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        validateSourceOwnership(destination.getIncomingSourceId());
+        IncomingSource source = requireSource(destination.getIncomingSourceId());
 
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
 
@@ -193,10 +210,18 @@ public class IncomingDestinationService {
         if (request.getPayloadTransform() != null) {
             destination.setPayloadTransform(request.getPayloadTransform().isBlank() ? null : request.getPayloadTransform());
         }
+        // Same rule as payloadTransform on the line above, which is the point: a blank value
+        // detaches the destination from its template. There was no way to do that at all --
+        // transformationId only ever moved from one template to another, so a destination that
+        // acquired one was stuck with a transform forever, and the field's own documentation
+        // ("overrides payloadTransform if set") meant payloadTransform could not be got back to
+        // either.
         if (request.getTransformationId() != null) {
-            validateTransformationBelongsToProject(request.getTransformationId(),
-                    resolveProjectIdForSource(destination.getIncomingSourceId()));
-            destination.setTransformationId(request.getTransformationId());
+            UUID requested = parseTransformationId(request.getTransformationId());
+            if (requested != null) {
+                validateTransformationBelongsToProject(requested, source.getProjectId());
+            }
+            destination.setTransformationId(requested);
         }
 
         destination = destinationRepository.saveAndFlush(destination);
@@ -209,7 +234,7 @@ public class IncomingDestinationService {
     public void deleteDestination(UUID id) {
         IncomingDestination destination = destinationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        validateSourceOwnership(destination.getIncomingSourceId());
+        requireSource(destination.getIncomingSourceId());
         destinationRepository.delete(destination);
         log.info("Deleted incoming destination: id={}", id);
     }

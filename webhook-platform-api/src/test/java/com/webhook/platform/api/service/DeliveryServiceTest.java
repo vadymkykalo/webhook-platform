@@ -57,6 +57,8 @@ class DeliveryServiceTest {
     @Mock private EventRepository eventRepository;
     @Mock private ProjectRepository projectRepository;
 
+    @Mock private PiiMaskingService piiMaskingService;
+
     private DeliveryService deliveryService;
 
     private final UUID orgId = UUID.randomUUID();
@@ -68,7 +70,7 @@ class DeliveryServiceTest {
     void setUp() {
         deliveryService = new DeliveryService(deliveryRepository, deliveryAttemptRepository, endpointRepository,
                 eventRepository, projectRepository, new ObjectMapper(),
-                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()));
+                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()), piiMaskingService);
     }
 
     private Event eventInProject() {

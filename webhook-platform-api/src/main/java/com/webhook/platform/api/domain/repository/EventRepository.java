@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.Event;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -126,4 +127,58 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate,
             @Param("eventType") String eventType);
+
+    /**
+     * Deletes one batch of events past the retention cutoff, newest-safe.
+     *
+     * <p>The only thing in the codebase that bounds the growth of {@code events} and, through
+     * it, {@code deliveries}. Retention for those two used to live solely in
+     * {@code RetentionCleanupScheduler}, which returns immediately unless billing is enabled —
+     * so the self-hosted default, which is also the recommended deployment, deleted neither
+     * ever. {@code delivery_attempts} partitions were being dropped at 90 days while the parent
+     * rows carrying the payloads stayed forever.
+     *
+     * <p>One statement, because {@code deliveries.event_id} is {@code ON DELETE CASCADE} to here
+     * (V001) and {@code delivery_attempts.delivery_id} is {@code ON DELETE CASCADE} to
+     * deliveries (V061): deleting the event takes the whole tree with it. Doing it in three
+     * hand-ordered steps, as the billing scheduler does, only reproduces what the constraints
+     * already guarantee.
+     *
+     * <p>An event with a delivery still PENDING or PROCESSING is left alone however old it is.
+     * Those rows are owned by the pipeline — a claim may be live on one — and deleting an event
+     * out from under an in-flight attempt is a far worse failure than keeping it another day.
+     *
+     * <p>Native, for the {@code LIMIT} that JPQL has no bulk-delete form of; the subquery is what
+     * makes the limit apply to the rows chosen rather than to the delete. Deliberately carries no
+     * {@code organization_id}: it runs {@code @SystemTenant} across every organization, and a
+     * tenant predicate would leave every other organization's rows behind — which is the bug.
+     * Listed in {@code NativeQueryTenantPredicateTest.SYSTEM_PATHS} with that reason.
+     *
+     * @return how many rows this call removed, so the caller stops when a batch comes back short
+     */
+    @Modifying
+    @Query(value = """
+        DELETE FROM events
+         WHERE id IN (
+               SELECT e.id FROM events e
+                WHERE e.created_at < :cutoff
+                  AND NOT EXISTS (
+                      SELECT 1 FROM deliveries d
+                       WHERE d.event_id = e.id
+                         AND d.status IN ('PENDING', 'PROCESSING')
+                  )
+                LIMIT :limit
+         )
+        """, nativeQuery = true)
+    int deleteOldEvents(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
+
+    /** Estimated row count for {@code events}, for the gauge that makes growth visible. */
+    @Query(value = "SELECT COALESCE(n_live_tup, 0) FROM pg_stat_user_tables WHERE relname = 'events'",
+            nativeQuery = true)
+    long estimatedRowCount();
+
+    /** Estimated row count for {@code deliveries} — one row per fan-out, so the larger of the two. */
+    @Query(value = "SELECT COALESCE(n_live_tup, 0) FROM pg_stat_user_tables WHERE relname = 'deliveries'",
+            nativeQuery = true)
+    long estimatedDeliveryRowCount();
 }

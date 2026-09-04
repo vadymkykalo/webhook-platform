@@ -18,6 +18,15 @@ public interface AlertEventRepository extends JpaRepository<AlertEvent, UUID> {
 
     long countByProjectIdAndResolvedFalse(UUID projectId);
 
+    /**
+     * Whether this rule already has an alert nobody has dealt with.
+     *
+     * <p>What makes the evaluator fire on a *crossing* rather than on every tick. Without it a
+     * rule whose condition holds for an hour would write sixty identical events and send sixty
+     * notifications, which is how alerting becomes something people mute.
+     */
+    boolean existsByAlertRuleIdAndResolvedFalse(UUID alertRuleId);
+
     @Modifying
     @Query("UPDATE AlertEvent e SET e.resolved = true, e.resolvedAt = :now WHERE e.projectId = :projectId AND e.resolved = false")
     int resolveAllByProjectId(@Param("projectId") UUID projectId, @Param("now") Instant now);

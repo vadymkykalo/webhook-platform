@@ -16,7 +16,7 @@ import {
   useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
   useRotateSecret, useVerifyEndpoint, useSkipVerification,
 } from '../api/queries';
-import type { EndpointResponse } from '../types/api.types';
+import type { EndpointResponse, SignatureScheme } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -35,6 +35,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import MtlsConfigModal from '../components/MtlsConfigModal';
+import SignatureSchemePicker from '../components/SignatureSchemePicker';
 import { SecretField } from './ConnectionSetupPage';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
@@ -78,6 +79,7 @@ export default function EndpointsPage() {
   const [description, setDescription] = useState('');
   const [rateLimitPerSecond, setRateLimitPerSecond] = useState<number | undefined>(undefined);
   const [allowedSourceIps, setAllowedSourceIps] = useState('');
+  const [signatureScheme, setSignatureScheme] = useState<SignatureScheme>('BOTH');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [toggleId, setToggleId] = useState<string | null>(null);
   const [rotateId, setRotateId] = useState<string | null>(null);
@@ -132,12 +134,14 @@ export default function EndpointsPage() {
         secret,
         rateLimitPerSecond: rateLimitPerSecond || undefined,
         allowedSourceIps: allowedSourceIps || undefined,
+        signatureScheme,
       });
       setShowCreateDialog(false);
       setUrl('');
       setDescription('');
       setRateLimitPerSecond(undefined);
       setAllowedSourceIps('');
+      setSignatureScheme('BOTH');
       setNewSecret(secret);
       showSuccess(t('endpoints.toast.created'));
     } catch (err) {
@@ -477,6 +481,15 @@ export default function EndpointsPage() {
                 />
                 <p className="text-xs text-muted-foreground">{t('endpoints.createDialog.allowedIpsHint')}</p>
               </div>
+              {/* The same choice the Connection surfaces offer. Without it an endpoint created
+                  here took the BOTH default silently, and the person creating it was never
+                  shown that the scheme — which decides what their receiver has to verify — was
+                  a decision at all. */}
+              <SignatureSchemePicker
+                value={signatureScheme}
+                onChange={setSignatureScheme}
+                disabled={creating}
+              />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)} disabled={creating}>

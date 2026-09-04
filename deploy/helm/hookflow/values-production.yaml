@@ -15,8 +15,7 @@ api:
   env:
     APP_ENV: production
     LOG_LEVEL: WARN
-    EMAIL_ENABLED: "true"
-  
+
   hpa:
     enabled: true
     minReplicas: 3
@@ -59,6 +58,33 @@ ui:
   pdb:
     enabled: true
     minAvailable: 1
+
+# Transactional email.
+#
+# This used to be `api.env.EMAIL_ENABLED: "true"` and nothing else — the chart
+# carried no SMTP settings at all, so production turned on mail the deployment
+# had no way to send: signup accepted the account and then could not deliver
+# the verification link. Enabled here still, because a production install that
+# cannot send mail creates every account already-verified and can never invite
+# anyone (install.sh warns about the same thing), but the relay has to be
+# supplied — the same bring-your-own arrangement as redis.external below:
+#
+#   --set email.smtp.host=smtp.example.com \
+#   --set email.smtp.username=hookflow@example.com \
+#   --set email.smtp.existingSecret=hookflow-smtp-secret \
+#   --set app.baseUrl=https://app.hookflow.yourdomain.com
+#
+# Set email.enabled=false if you would rather run without mail than with a
+# half-configured relay.
+email:
+  enabled: true
+  from: noreply@hookflow.dev
+  smtp:
+    host: ""  # e.g., smtp.example.com — required while enabled is true
+    port: 587
+    auth: true
+    starttls: true
+    existingSecret: ""  # Secret with the SMTP password under `smtp-password`
 
 # Use external managed services in production
 postgresql:

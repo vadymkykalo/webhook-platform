@@ -8,7 +8,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.webhook.platform.common.http.SsrfProtectionCustomizer;
+import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.List;
@@ -25,8 +28,15 @@ public class AlertNotificationService {
     public AlertNotificationService(
             WebClient.Builder webClientBuilder,
             EmailService emailService,
-            @Value("${app.alerts.notifications-enabled:false}") boolean enabled) {
+            @Value("${app.alerts.notifications-enabled:false}") boolean enabled,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
+        // Validating the URL when the rule is written is necessary and not sufficient: between
+        // that check and this request the name can resolve somewhere else. Every other outbound
+        // client in the product closes that window with the same connector; this one did not,
+        // and it is the client a user gets to aim.
         this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(
+                        SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps)))
                 .defaultHeader("User-Agent", "Hookflow-Alerts/1.0")
                 .build();
         this.emailService = emailService;

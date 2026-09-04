@@ -99,6 +99,20 @@ management:
       enabled: true
     readinessState:
       enabled: true
+    mail:
+      # Off, because mail is not what this service is for. Spring registers a
+      # MailHealthIndicator as soon as spring-boot-starter-mail is on the classpath and
+      # app.email.enabled is on, and it opens an SMTP connection on every health check —
+      # so an unreachable or misconfigured relay turned the whole aggregate DOWN and
+      # /actuator/health answered 503 while the API was ingesting and delivering webhooks
+      # perfectly well. The kind smoke test found exactly that.
+      #
+      # The consequence is worse than a red dashboard: anything paging on /actuator/health
+      # pages for an SMTP blip, and an operator who has not configured mail at all (the
+      # shipped default) gets a permanently unhealthy service. Verification, reset and
+      # invite mail failing is real and worth an alert — but it is a degradation of one
+      # feature, not a reason to take the platform out of rotation.
+      enabled: false
   server:
     # Defaults to the same port as `server.port` (i.e. no split — actuator
     # stays behind SecurityConfig's JWT/API-key auth on the main port, same as
@@ -125,10 +139,10 @@ outbox:
     max-per-project: ${OUTBOX_MAX_PER_PROJECT:30}
 
 data-retention:
-  outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
   delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
   successful-attempts-retention-days: ${DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS:14}
   incoming-events-retention-days: ${DATA_RETENTION_INCOMING_EVENTS_DAYS:30}
+  events-retention-days: ${DATA_RETENTION_EVENTS_DAYS:90}
   max-attempts-per-delivery: ${DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY:10}
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
@@ -136,7 +150,6 @@ data-retention:
   burst-cleanup-cron: ${DATA_RETENTION_BURST_CLEANUP_CRON:0 0 */4 * * *}
   table-metrics-interval-ms: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:900000}
   tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
-  tunnel-log-cleanup-cron: ${TUNNEL_LOG_CLEANUP_CRON:0 30 2 * * *}
 
 # Partition maintenance for the declaratively-partitioned high-volume tables
 # (delivery_attempts, tunnel_request_log — see V052/V053 migrations and
@@ -158,6 +171,21 @@ auth:
   rate-limit:
     login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
     register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
+  bcrypt:
+    # BCrypt work factor. Raising it is not a migration: the cost is written into every hash,
+    # so existing passwords keep verifying at the cost they were stored with.
+    strength: ${AUTH_BCRYPT_STRENGTH:12}
+  lockout:
+    # Bounds how many passwords may be guessed against one account, which rate limiting does not.
+    # Held in Postgres, not Redis: the auth rate limiter degrades to a per-instance bucket when
+    # Redis is unavailable, and a lockout with that property is not a lockout.
+    enabled: ${AUTH_LOCKOUT_ENABLED:true}
+    threshold: ${AUTH_LOCKOUT_THRESHOLD:5}
+    initial-seconds: ${AUTH_LOCKOUT_INITIAL_SECONDS:60}
+    max-seconds: ${AUTH_LOCKOUT_MAX_SECONDS:900}
+    failure-window-minutes: ${AUTH_LOCKOUT_FAILURE_WINDOW_MINUTES:60}
+  session:
+    cleanup-interval-ms: ${AUTH_SESSION_CLEANUP_INTERVAL_MS:3600000}
 
 rate-limit:
   global:
@@ -191,6 +219,10 @@ webhook:
     replay-window-minutes: ${WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES:5}
   incoming:
     max-payload-size-bytes: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:524288}
+    # Applies to a Source that names no limit of its own. Matches
+    # event.ingestion.rate-limit-per-second: an incoming webhook costs the platform what an
+    # ingested event does.
+    rate-limit-per-second: ${WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND:100}
   # Trusted reverse-proxy peers, comma-separated IPs and/or CIDR ranges. X-Forwarded-For /
   # X-Real-IP are honoured ONLY when the direct TCP peer matches one of these — otherwise
   # ignored. Empty (default) trusts nothing: safe when the app is reachable directly.
@@ -218,11 +250,12 @@ workflow:
     max-recursion-depth: ${WORKFLOW_MAX_RECURSION_DEPTH:3}
     stuck-threshold-minutes: ${WORKFLOW_STUCK_THRESHOLD_MINUTES:15}
     recovery-interval-ms: ${WORKFLOW_RECOVERY_INTERVAL_MS:120000}
+    resume-interval-ms: ${WORKFLOW_RESUME_INTERVAL_MS:5000}
+    resume-batch-size: ${WORKFLOW_RESUME_BATCH_SIZE:50}
   node-timeout:
     default-seconds: ${WORKFLOW_NODE_TIMEOUT_DEFAULT_SECONDS:30}
     http-seconds: ${WORKFLOW_NODE_TIMEOUT_HTTP_SECONDS:60}
     slack-seconds: ${WORKFLOW_NODE_TIMEOUT_SLACK_SECONDS:60}
-    delay-seconds: ${WORKFLOW_NODE_TIMEOUT_DELAY_SECONDS:305}
     create-event-seconds: ${WORKFLOW_NODE_TIMEOUT_CREATE_EVENT_SECONDS:30}
     pool-size: ${WORKFLOW_NODE_TIMEOUT_POOL_SIZE:16}
   shutdown:
@@ -251,6 +284,7 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
   alerts:
     notifications-enabled: ${ALERTS_NOTIFICATIONS_ENABLED:false}
+    evaluation-cron: ${ALERTS_EVALUATION_CRON:0 * * * * *}
   email:
     enabled: ${EMAIL_ENABLED:false}
     from: ${EMAIL_FROM:noreply@hookflow.dev}

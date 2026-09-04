@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.webhook.platform.common.util.CryptoUtils;
 import java.time.Instant;
@@ -182,5 +183,86 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
         String tokenHash = CryptoUtils.hashApiKey(inviteToken);
         assertFalse(membershipRepository.findByInviteTokenHash(tokenHash).isPresent(),
                 "Invite token hash should be cleared after acceptance");
+    }
+
+    /**
+     * With {@code app.email.enabled=false} — the shipped default, and what these tests
+     * run under — nothing is mailed, so the link returned to the inviting owner is the
+     * only copy of the invite that exists. It has to be the real token.
+     */
+    @Test
+    public void testInviteResponseCarriesAWorkingLinkAndTheListingDoesNot() throws Exception {
+        UserContext owner = registerUser("link-owner@test.com", "LinkOrg");
+        UUID orgId = owner.currentUser().getOrganization().getId();
+
+        MemberResponse invited = addMember(owner, orgId, "link-invitee@test.com");
+
+        assertEquals(MembershipStatus.INVITED, invited.getStatus());
+        assertNotNull(invited.getInviteExpiresAt(), "a pending invite states when it stops working");
+        assertNotNull(invited.getInviteUrl(), "the owner has no other way to deliver the invite");
+
+        Membership membership = membershipRepository
+                .findByInviteTokenHash(CryptoUtils.hashApiKey(tokenOf(invited.getInviteUrl())))
+                .orElseThrow(() -> new AssertionError("the returned link does not carry the stored token"));
+        assertEquals(invited.getUserId(), membership.getUserId());
+
+        // The listing is readable by every member of the organization, so it carries the
+        // expiry and never the link. This is the leak the token was moved out of.
+        mockMvc.perform(get("/api/v1/orgs/" + orgId + "/members")
+                        .header("Authorization", "Bearer " + owner.auth().getAccessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.status == 'INVITED')].inviteExpiresAt").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.inviteUrl != null)]").isEmpty());
+    }
+
+    @Test
+    public void testReissuingAnInviteRetiresThePreviousLink() throws Exception {
+        UserContext owner = registerUser("reissue-owner@test.com", "ReissueOrg");
+        UUID orgId = owner.currentUser().getOrganization().getId();
+
+        MemberResponse invited = addMember(owner, orgId, "reissue-invitee@test.com");
+        String staleToken = tokenOf(invited.getInviteUrl());
+
+        MvcResult reissueResult = mockMvc.perform(
+                        post("/api/v1/orgs/" + orgId + "/members/" + invited.getUserId() + "/invite")
+                                .header("Authorization", "Bearer " + owner.auth().getAccessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INVITED"))
+                .andReturn();
+
+        MemberResponse reissued = objectMapper.readValue(
+                reissueResult.getResponse().getContentAsString(), MemberResponse.class);
+        String freshToken = tokenOf(reissued.getInviteUrl());
+
+        assertNotEquals(staleToken, freshToken, "re-issuing must mint a new token");
+        assertFalse(membershipRepository.findByInviteTokenHash(CryptoUtils.hashApiKey(staleToken)).isPresent(),
+                "the link that was handed out before must stop working");
+        assertTrue(membershipRepository.findByInviteTokenHash(CryptoUtils.hashApiKey(freshToken)).isPresent(),
+                "the link handed out now must work");
+        assertTrue(reissued.getInviteExpiresAt().isAfter(invited.getInviteExpiresAt()),
+                "re-issuing restarts the expiry");
+    }
+
+    /** Invites {@code email} into {@code orgId} as a DEVELOPER, as the owner would. */
+    private MemberResponse addMember(UserContext owner, UUID orgId, String email) throws Exception {
+        AddMemberRequest request = AddMemberRequest.builder()
+                .email(email)
+                .role(MembershipRole.DEVELOPER)
+                .build();
+
+        MvcResult result = mockMvc.perform(post("/api/v1/orgs/" + orgId + "/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + owner.auth().getAccessToken()))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return objectMapper.readValue(result.getResponse().getContentAsString(), MemberResponse.class);
+    }
+
+    /** The token out of an accept-invite URL, as the invitee's browser would send it. */
+    private String tokenOf(String inviteUrl) {
+        return UriComponentsBuilder.fromUriString(inviteUrl).build()
+                .getQueryParams().getFirst("token");
     }
 }

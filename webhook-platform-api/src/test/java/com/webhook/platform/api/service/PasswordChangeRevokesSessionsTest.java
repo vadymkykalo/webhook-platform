@@ -35,6 +35,11 @@ import static org.mockito.Mockito.when;
  * <p>The mechanism was already here — {@code TokenBlacklistService.revokeAllUserTokens} bumps
  * a per-user epoch that {@code JwtAuthenticationFilter} checks — and was wired into
  * refresh-token reuse detection, but not into either password path.</p>
+ *
+ * <p>It now goes through {@code UserSessionService.revokeAllSessions}, which bumps that same
+ * epoch <em>and</em> marks the {@code user_sessions} rows revoked. Both halves matter: the epoch
+ * is what stops the tokens, the rows are what stops the session list from still showing a device
+ * as live after its owner has just changed their password to get rid of it.</p>
  */
 @ExtendWith(MockitoExtension.class)
 class PasswordChangeRevokesSessionsTest {
@@ -45,6 +50,8 @@ class PasswordChangeRevokesSessionsTest {
     @Mock private PlanRepository planRepository;
     @Mock private JwtUtil jwtUtil;
     @Mock private TokenBlacklistService tokenBlacklistService;
+    @Mock private UserSessionService userSessionService;
+    @Mock private AccountLockoutService accountLockoutService;
     @Mock private EmailService emailService;
 
     private AuthService authService;
@@ -53,12 +60,13 @@ class PasswordChangeRevokesSessionsTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
-                planRepository, jwtUtil, tokenBlacklistService, emailService, false);
+                planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
+                userSessionService, accountLockoutService, emailService, false);
 
         user = new User();
         user.setId(UUID.randomUUID());
         user.setEmail("owner@example.com");
-        user.setPasswordHash(new BCryptPasswordEncoder().encode("old-password"));
+        user.setPasswordHash(new BCryptPasswordEncoder(4).encode("old-password"));
     }
 
     @Test
@@ -73,7 +81,7 @@ class PasswordChangeRevokesSessionsTest {
         authService.resetPassword(token, "brand-new-password");
 
         // The whole point of a reset is that whoever had access before does not any more.
-        verify(tokenBlacklistService).revokeAllUserTokens(user.getId());
+        verify(userSessionService).revokeAllSessions(user.getId());
     }
 
     @Test
@@ -83,6 +91,6 @@ class PasswordChangeRevokesSessionsTest {
 
         authService.changePassword(user.getId(), "old-password", "brand-new-password");
 
-        verify(tokenBlacklistService).revokeAllUserTokens(user.getId());
+        verify(userSessionService).revokeAllSessions(user.getId());
     }
 }

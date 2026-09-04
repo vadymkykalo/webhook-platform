@@ -44,9 +44,23 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, isLoading = false, disabled, children, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+    // Slot requires exactly one element child. Rendering
+    // `{isLoading && <Loader2/>}{children}` handed it two — `false` and the
+    // element — so every `asChild` call site white-screened with "Slot failed
+    // to slot onto its children", whether or not anything was loading. The
+    // spinner belongs to the <button> branch, which is the only branch that
+    // owns its own markup; asChild passes the caller's element through
+    // untouched.
+    if (asChild) {
+      return (
+        <Slot className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
+          {children}
+        </Slot>
+      )
+    }
+
     return (
-      <Comp
+      <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || isLoading}
@@ -54,7 +68,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {children}
-      </Comp>
+      </button>
     )
   }
 )

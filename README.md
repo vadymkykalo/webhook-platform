@@ -32,24 +32,28 @@ config to write, no secrets to invent.
 
 ---
 
+**[Quick start](#quick-start)** ·
+**[What it does](#what-it-does)** ·
+**[Architecture](#architecture)** ·
+**[API & SDKs](#api-reference--sdks)** ·
+**[Documentation](#documentation)** ·
+**[Roadmap](./ROADMAP.md)** ·
+**[Changelog](./CHANGELOG.md)** ·
+**[Contributing](#contributing)**
+
+---
+
 ## Quick Start
 
-**Prerequisites:** Docker 20.10+, Compose v2, and about 4 GB of RAM. The images
-are [multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
-(amd64 + arm64), so nothing is compiled on your machine.
+**Prerequisites:** Docker 20.10+, Compose v2, ~4 GB of RAM. The images are
+[multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform),
+so nothing is compiled on your machine.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
-
-# Somewhere other than ~/hookflow, or on a port other than 80:
-#   ... | bash -s -- --dir /opt/hookflow --port 8080
-```
-
-The installer refuses to start until Docker, memory, disk and the port all
-check out, and it verifies the configuration it wrote before starting anything.
-Then open **http://localhost**, register, and create a project. Nothing is
-gated behind a verification email you never receive — with no SMTP configured,
-the account is active immediately.
+The installer above refuses to start until Docker, memory, disk and the port
+all check out, and verifies the configuration it wrote before starting
+anything. Open **http://localhost**, register, create a project — nothing is
+gated behind a verification email you never receive. Pass
+`-s -- --dir /opt/hookflow --port 8080` to put it elsewhere.
 
 ```bash
 # Send your first event, with the API key the dashboard just gave you
@@ -93,32 +97,18 @@ without it restores rows nothing can read.
 To remove it: `... install.sh | bash -s -- --uninstall` keeps your data,
 `--purge` deletes it.
 
-### Running it from a clone (contributors)
-
-Different command, same stack: this builds the three services from your
-working tree instead of pulling a release.
+### Running it from a clone
 
 ```bash
 git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
-make up            # build everything and start it
-make health        # is it up
-make logs-api      # or logs-worker, logs-ui
-make down          # stop
+make up      # builds the three services from your tree, writes .env, creates the topics
+make help    # everything else
 ```
 
-`make up` copies `.env.dist` to `.env` for you and creates the Kafka topics.
-`make dev-api` / `dev-worker` / `dev-ui` rebuild and restart one service — the
-fast loop once the stack is running. `make help` lists the rest.
-
-**http://localhost:8080** — the same one-port shape as an installed deployment,
-so nothing you learn here stops working when you deploy. There is one Compose
-file, `docker-compose.yml`, which resolves every service to a published image;
-`docker-compose.build.yml` is a 25-line overlay that builds the three services
-this project owns from your working tree instead, and that is the only
-difference between running from a clone and running a release.
-
-[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the prerequisites, the test commands
-that match CI, and what each build guard means when it fails.
+Same one-port shape as an installed deployment, on **http://localhost:8080** —
+nothing you learn here stops working when you deploy.
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the test commands CI runs and what
+each build guard means when it fails.
 
 ---
 
@@ -133,29 +123,36 @@ attempt is on the record with the response it got.
 
 **Incoming** — a provider posts to a URL you own; Hookflow verifies the
 signature and forwards it to the destinations you nominated. Stripe, GitHub,
-GitLab, Shopify and Slack are understood out of the box, plus generic HMAC.
+GitLab, Shopify, Slack and Twilio are understood out of the box, plus generic
+HMAC for anything else.
 
 Both directions run the same claim → send → classify → finalise loop, so a fix
 to attempt behaviour lands once rather than twice.
 
-Also: a schema registry with breaking-change detection, wildcard subscriptions,
-JSONPath transforms, replay, a CLI that tunnels webhooks to `localhost` while
-you develop, per-org rate limits, AES-256-GCM at rest, SSRF protection,
-Prometheus metrics and an audit log. Organizations → Projects → Endpoints, with
-Owner/Developer/Viewer roles.
+### Everything in the box
+
+| | |
+|---|---|
+| **Delivery** | Six-rung retry ladder · per-endpoint FIFO ordering · rate limits and concurrency caps · shared circuit breaker · 96h hard cap |
+| **Recovery** | Failed Messages with bulk requeue · Time Machine replay that builds *fresh* deliveries, not re-sends |
+| **Signing** | HMAC-SHA256 in two schemes at once, including [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) · secret rotation with an overlap window |
+| **Shaping** | Rules engine · JSONPath transformations · schema registry with compatibility modes · wildcard subscriptions · workflow builder |
+| **Incoming** | Stripe, GitHub, GitLab, Shopify, Slack, Twilio and generic HMAC · deduplication · authenticated forwarding |
+| **Developing** | CLI tunnel to `localhost` · disposable receiving endpoints · transformation preview and delivery dry-run |
+| **Security** | Row-level tenant isolation · AES-256-GCM with key rotation · SSRF protection · mTLS · PII masking · audit log |
+| **Operating** | Prometheus metrics, 4 dashboards, 13 alert rules · configurable retention · GDPR export · CI-tested restore drill |
+
+Organizations → Projects → Endpoints, with Owner / Developer / Viewer roles.
+Nothing is gated — see [Is this really MIT?](#is-this-really-mit-what-is-the-billing-code-doing-here)
+Honest comparison against Svix, Hookdeck and Convoy, gaps included:
+[`docs/guides/comparison.md`](docs/guides/comparison.md).
 
 ## Architecture
 
-Two directions, one attempt lifecycle. **Outgoing** carries a customer's events
-to endpoints their users registered; Hookflow signs what it sends. **Incoming**
-carries third-party webhooks to destinations the customer nominated; Hookflow
-verifies what it receives. Both go through the same claim → admit → send →
-classify → finalise loop, so a fix to attempt behaviour lands once.
-
-The write path never publishes to Kafka directly: work and its announcement are
-written to a transactional outbox in the same statement, so they cannot
-disagree. The worker consumes, attempts delivery, and reschedules onto one of
-six delay topics that make up the retry ladder.
+The write path never publishes to Kafka directly: work and its announcement go
+into a transactional outbox in the same statement, so they cannot disagree. The
+worker consumes, attempts delivery, and reschedules onto one of six delay
+topics that make up the retry ladder.
 
 ```
 Outgoing   your app ──▶ api ──▶ outbox (same txn) ──▶ Kafka ──▶ worker ──▶ endpoint
@@ -166,37 +163,52 @@ Outgoing   your app ──▶ api ──▶ outbox (same txn) ──▶ Kafka �
 Incoming   provider ──▶ /ingress/{token} ──▶ verify signature ──▶ Kafka ──▶ worker ──▶ destination
 ```
 
-**[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** has the component diagram and
-the full sequence diagrams for both directions and the CLI tunnel.
-**[`CONTEXT.md`](CONTEXT.md)** is the vocabulary all of it uses.
+**[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** goes the rest of the way:
+fourteen diagrams covering the data model, the claim and its fence token, the
+admission order, the delivery state machine, ordering and gaps, tenancy and the
+production topology — plus the consistency model, the partitioning and the
+failure modes in prose. **[`CONTEXT.md`](CONTEXT.md)** is the vocabulary all of
+it uses.
 
 
 ## API Reference & SDKs
 
 - **In-app docs** — the dashboard's [Documentation page](webhook-platform-ui/src/pages/DocumentationPage.tsx) has prose, concepts and per-language quick-start samples for every endpoint (open `/docs` — it needs no account).
-- **OpenAPI spec** — [`openapi.yaml`](./openapi.yaml), committed at the repo root and generated by `springdoc-openapi` from the controllers. `OpenApiDriftIntegrationTest` fails the build if it drifts from what the API actually serves; after an intentional API change, regenerate and commit it with `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`. Browse it rendered at [`docs/api-reference.html`](docs/api-reference.html) (Redoc) — served live at the project's GitHub Pages site once `Settings → Pages → Source = GitHub Actions` is enabled, or open it locally: `python3 -m http.server 8000` from the repo root, then visit `http://localhost:8000/docs/api-reference.html`.
+- **OpenAPI spec** — [`openapi.yaml`](./openapi.yaml), generated by `springdoc-openapi` from the controllers and committed. `OpenApiDriftIntegrationTest` fails the build if it drifts from what the API serves. Rendered with Redoc at [`docs/api-reference.html`](docs/api-reference.html).
 - **Swagger UI** — `http://localhost:8080/swagger-ui.html` against a running instance (`SWAGGER_ENABLED=true`).
 
 ### SDKs
 
-Official SDKs for [Node](sdks/node) (`@webhook-platform/node`),
-[Python](sdks/python) (`webhook-platform`) and [PHP](sdks/php)
-(`webhook-platform/php`). They cover the send-an-event / manage-endpoints /
-verify-a-signature workflow — 7 of the platform's 35 REST controllers — and each
-exposes a generic authenticated-request escape hatch for the rest. All three
-authenticate with `X-API-Key` only, so minting that key is a one-time step in
-the dashboard. Each SDK's README has the coverage table and its live-API smoke
-check.
+[Node](sdks/node) · [Python](sdks/python) · [PHP](sdks/php). Each covers
+send-an-event, manage-endpoints and verify-a-signature, with a generic
+authenticated-request escape hatch for the rest, and authenticates with
+`X-API-Key` alone. Coverage tables are in each SDK's README.
 
 ---
+
+## Documentation
+
+**[`docs/`](docs/README.md)** is the front door, split by audience: the
+repository holds what you read while evaluating or operating Hookflow, the
+dashboard's `/docs` holds what you read with the product open. Nothing is
+written in both places.
+
+[Architecture](docs/ARCHITECTURE.md) ·
+[Self-hosting](docs/SELF_HOSTED_GUIDE.md) ·
+[Operations](docs/OPERATIONS.md) ·
+[Observability](docs/guides/observability.md) ·
+[Access control](docs/guides/rbac-and-tenancy.md) ·
+[Retention & export](docs/guides/data-retention.md) ·
+[Migrating here](docs/guides/migrating-from-other-providers.md) ·
+[Roadmap](ROADMAP.md) ·
+[Changelog](CHANGELOG.md) ·
+[Upgrading](UPGRADING.md)
 
 ## Running it in production
 
 [`docs/SELF_HOSTED_GUIDE.md`](docs/SELF_HOSTED_GUIDE.md) is the operator's
-document: sizing, the port table, TLS and mTLS, backup and restore, the upgrade
-path, and what to check when something is wrong. `make help` lists every
-development target. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers the
-runbooks.
+document — sizing, ports, TLS and mTLS, backup and restore, the upgrade path —
+and [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers the runbooks.
 
 ## CLI
 
@@ -211,8 +223,7 @@ hookflow events <projectId> --follow
 hookflow replay <projectId> --dry-run
 ```
 
-`hookflow -h` lists the rest: tunnel management, config profiles for switching
-between staging and production, and diagnostics.
+`hookflow -h` lists the rest.
 
 ## Contributing
 
@@ -234,22 +245,16 @@ is what makes that true: with billing off, quota and feature checks are
 short-circuited and nothing is gated.
 
 The `Plan`/`Subscription` entities, the Stripe and WayForPay providers and the
-seeded price rows in `V036__billing_plans.sql` exist because we also run a
-managed cloud instance of this same code, and that is the only thing we sell.
-Selling hosting rather than features is why none of it needs to be closed —
-so it lives in the open repository like everything else, dormant unless you
-turn it on.
-
-If you would rather not carry the price rows at all, they are inert data in
-five table rows; nothing reads them while billing is off.
+seeded price rows exist because the plan is to offer a managed instance of this
+same code, and hosting is the only thing that would ever be sold. That instance
+is not running yet. Selling hosting rather than features is why none of this
+needs to be closed, so it lives here like everything else — inert while billing
+is off.
 
 ---
 
 ## License
 
-[MIT](./LICENSE) © Vadym Kykalo — see [`NOTICE`](./NOTICE) for third-party
-attributions and [`docs/licenses/`](docs/licenses/) for the generated
-dependency license report and SBOM (backend: 230 Maven dependencies scanned,
-0 copyleft; frontend: 654 npm packages scanned, 0 copyleft), plus the
-recorded decisions on MinIO's AGPL-3.0 license and the Helm chart's Bitnami
-subchart pins.
+[MIT](./LICENSE) © Vadym Kykalo — [`NOTICE`](./NOTICE) for third-party
+attributions, [`docs/licenses/`](docs/licenses/) for the generated dependency
+report, SBOMs and the recorded licensing decisions. No copyleft in either tree.

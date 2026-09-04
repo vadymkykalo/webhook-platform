@@ -2,15 +2,20 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
   SlidersHorizontal,
+  Bell,
   Book,
   Code,
+  EyeOff,
   FileCheck,
   Fingerprint,
   GitBranch,
   Key,
+  ListOrdered,
+  Lock,
   Package,
   RefreshCw,
   Shield,
+  Shuffle,
   Terminal,
   Workflow,
   Zap,
@@ -31,9 +36,14 @@ export type SectionId =
   | 'retries'
   | 'incoming-webhooks'
   | 'rules-engine'
+  | 'transformations'
+  | 'ordering'
   | 'schema-registry'
   | 'deterministic-replay'
   | 'workflows'
+  | 'pii-masking'
+  | 'alerts'
+  | 'endpoint-security'
   | 'errors'
   | 'cli'
   | 'sdks'
@@ -54,9 +64,14 @@ export const GUIDE_SECTIONS: SectionMeta[] = [
   { id: 'retries', labelKey: 'docsPage.sections.retries', icon: RefreshCw },
   { id: 'incoming-webhooks', labelKey: 'docsPage.sections.incomingWebhooks', icon: ArrowDownToLine },
   { id: 'rules-engine', labelKey: 'docsPage.sections.rulesEngine', icon: GitBranch },
+  { id: 'transformations', labelKey: 'docsPage.sections.transformations', icon: Shuffle },
+  { id: 'ordering', labelKey: 'docsPage.sections.ordering', icon: ListOrdered },
   { id: 'schema-registry', labelKey: 'docsPage.sections.schemaRegistry', icon: FileCheck },
   { id: 'deterministic-replay', labelKey: 'docsPage.sections.deterministicReplay', icon: Fingerprint },
   { id: 'workflows', labelKey: 'docsPage.sections.workflowAutomation', icon: Workflow },
+  { id: 'endpoint-security', labelKey: 'docsPage.sections.endpointSecurity', icon: Lock },
+  { id: 'pii-masking', labelKey: 'docsPage.sections.piiMasking', icon: EyeOff },
+  { id: 'alerts', labelKey: 'docsPage.sections.alerts', icon: Bell },
   { id: 'errors', labelKey: 'docsPage.sections.errors', icon: Code },
   { id: 'cli', labelKey: 'docsPage.sections.cli', icon: Terminal },
   { id: 'sdks', labelKey: 'docsPage.sections.sdks', icon: Package },
@@ -81,6 +96,7 @@ const LEGACY_ANCHORS: Record<string, { section: SectionId; group?: string }> = {
   'subscriptions-api': { section: 'api-reference', group: 'subscriptions' },
   'deliveries-api': { section: 'api-reference', group: 'deliveries' },
   'transformations-api': { section: 'api-reference', group: 'transformations' },
+  'pii-masking-api': { section: 'api-reference', group: 'pii-masking' },
   'workflow-automation': { section: 'workflows' },
   api: { section: 'api-reference' },
   reference: { section: 'api-reference' },

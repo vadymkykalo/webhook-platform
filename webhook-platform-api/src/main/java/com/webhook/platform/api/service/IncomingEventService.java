@@ -51,6 +51,7 @@ public class IncomingEventService {
     private final ObjectMapper objectMapper;
     private final ForwardDispatch forwardDispatch;
     private final TransactionTemplate txTemplate;
+    private final PiiMaskingService piiMaskingService;
 
     public IncomingEventService(
             IncomingEventRepository eventRepository,
@@ -61,7 +62,8 @@ public class IncomingEventService {
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
             ForwardDispatch forwardDispatch,
-            PlatformTransactionManager txManager) {
+            PlatformTransactionManager txManager,
+            PiiMaskingService piiMaskingService) {
         this.eventRepository = eventRepository;
         this.sourceRepository = sourceRepository;
         this.forwardAttemptRepository = forwardAttemptRepository;
@@ -71,6 +73,7 @@ public class IncomingEventService {
         this.objectMapper = objectMapper;
         this.forwardDispatch = forwardDispatch;
         this.txTemplate = new TransactionTemplate(txManager);
+        this.piiMaskingService = piiMaskingService;
     }
 
     /**
@@ -132,6 +135,8 @@ public class IncomingEventService {
                         .status(attempt.getStatus())
                         .startedAt(attempt.getStartedAt())
                         .finishedAt(attempt.getFinishedAt())
+                        .requestHeadersJson(attempt.getRequestHeadersJson())
+                        .requestBodySnippet(attempt.getRequestBodySnippet())
                         .responseCode(attempt.getResponseCode())
                         .responseHeadersJson(attempt.getResponseHeadersJson())
                         .responseBodySnippet(attempt.getResponseBodySnippet())
@@ -155,15 +160,19 @@ public class IncomingEventService {
         }
 
         UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
+        // One session for the whole Replay, and a Ladder that starts at attempt 1 inside it.
+        // Reading MAX(attempt_number) and adding one is what this used to do, and it raced the
+        // live Ladder for the same number against a real unique index: whichever transaction
+        // lost rolled back, and when the loser was the worker's finalise the Attempt was left
+        // PROCESSING. V064 gives a Replay its own numbering so there is nothing to race for.
+        UUID replaySessionId = UUID.randomUUID();
         int replayed = 0;
         for (IncomingDestination destination : destinations) {
-            Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(eventId, destination.getId());
-            int nextAttempt = (maxAttempt != null ? maxAttempt : 0) + 1;
-
             IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
                     .incomingEventId(eventId)
                     .destinationId(destination.getId())
-                    .attemptNumber(nextAttempt)
+                    .attemptNumber(1)
+                    .replaySessionId(replaySessionId)
                     .status(ForwardAttemptStatus.PENDING)
                     .build();
             forwardAttemptRepository.save(attempt);
@@ -171,7 +180,7 @@ public class IncomingEventService {
             try {
                 outboxMessageRepository.save(forwardDispatch.outboxFor(eventId,
                         event.getIncomingSourceId(), destination.getId(), projectId,
-                        nextAttempt, ForwardDispatch.Reason.REPLAY));
+                        1, replaySessionId, ForwardDispatch.Reason.REPLAY));
                 replayed++;
             } catch (Exception e) {
                 log.error("Failed to create replay outbox message: eventId={}, destId={}",
@@ -228,11 +237,15 @@ public class IncomingEventService {
                     .build();
         }
 
-        // Process in batches to avoid long-held DB locks and connection pool exhaustion
+        // Process in batches to avoid long-held DB locks and connection pool exhaustion. One
+        // session spans the whole bulk Replay, batches included, so re-running it stays idempotent
+        // against the partial unique index V064 introduced.
+        UUID replaySessionId = UUID.randomUUID();
         int totalAttempts = 0;
         for (int i = 0; i < events.size(); i += BULK_REPLAY_BATCH_SIZE) {
             List<IncomingEvent> batch = events.subList(i, Math.min(i + BULK_REPLAY_BATCH_SIZE, events.size()));
-            totalAttempts += processBulkReplayBatch(batch, destinations, source.getId(), projectId);
+            totalAttempts += processBulkReplayBatch(batch, destinations, source.getId(), projectId,
+                    replaySessionId);
         }
 
         log.info("Bulk replayed {} events to {} destinations ({} total attempts) for source {}",
@@ -247,7 +260,7 @@ public class IncomingEventService {
     }
 
     private int processBulkReplayBatch(List<IncomingEvent> events, List<IncomingDestination> destinations,
-                                       UUID sourceId, UUID projectId) {
+                                       UUID sourceId, UUID projectId, UUID replaySessionId) {
         Integer result = txTemplate.execute(status -> {
             List<IncomingForwardAttempt> attemptsToSave = new ArrayList<>();
             List<OutboxMessage> outboxToSave = new ArrayList<>();
@@ -255,19 +268,17 @@ public class IncomingEventService {
 
             for (IncomingEvent event : events) {
                 for (IncomingDestination destination : destinations) {
-                    Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(event.getId(), destination.getId());
-                    int nextAttempt = (maxAttempt != null ? maxAttempt : 0) + 1;
-
                     attemptsToSave.add(IncomingForwardAttempt.builder()
                             .incomingEventId(event.getId())
                             .destinationId(destination.getId())
-                            .attemptNumber(nextAttempt)
+                            .attemptNumber(1)
+                            .replaySessionId(replaySessionId)
                             .status(ForwardAttemptStatus.PENDING)
                             .build());
 
                     try {
                         outboxToSave.add(forwardDispatch.outboxFor(event.getId(), sourceId,
-                                destination.getId(), projectId, nextAttempt,
+                                destination.getId(), projectId, 1, replaySessionId,
                                 ForwardDispatch.Reason.BULK_REPLAY));
                     } catch (Exception e) {
                         log.error("Failed to create bulk replay outbox: eventId={}, destId={}",
@@ -299,7 +310,20 @@ public class IncomingEventService {
                 .collect(Collectors.toMap(IncomingSource::getId, IncomingSource::getName, (a, b) -> a));
     }
 
+    /**
+     * The raw body a provider posted, with the project's masking rules applied.
+     *
+     * <p>Incoming carries whatever a third party sent — routinely a customer record, a payment
+     * or an address. The rules reached the outgoing events list and not this, so the same
+     * personal data was redacted on one screen and printed verbatim on the other. Masking is
+     * configured per project, and an incoming event reaches its project through its source.
+     */
     private IncomingEventResponse mapToResponse(IncomingEvent event, Map<UUID, String> sourceNames) {
+        UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
+        String bodyRaw = event.getBodyRaw();
+        if (bodyRaw != null && projectId != null) {
+            bodyRaw = piiMaskingService.sanitizePayload(projectId, bodyRaw);
+        }
         return IncomingEventResponse.builder()
                 .sourceName(sourceNames.get(event.getIncomingSourceId()))
                 .id(event.getId())
@@ -309,7 +333,7 @@ public class IncomingEventService {
                 .path(event.getPath())
                 .queryParams(event.getQueryParams())
                 .headersJson(event.getHeadersJson())
-                .bodyRaw(event.getBodyRaw())
+                .bodyRaw(bodyRaw)
                 .bodySha256(event.getBodySha256())
                 .contentType(event.getContentType())
                 .clientIp(event.getClientIp())

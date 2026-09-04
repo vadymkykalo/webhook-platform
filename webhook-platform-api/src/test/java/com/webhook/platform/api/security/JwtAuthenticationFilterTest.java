@@ -7,6 +7,7 @@ import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
@@ -16,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -46,7 +49,7 @@ class JwtAuthenticationFilterTest {
 
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
 
-        String token = jwtUtil.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER);
+        String token = jwtUtil.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -69,6 +72,72 @@ class JwtAuthenticationFilterTest {
                         "returns, or a future request handled on the same thread would start out with another " +
                         "request's already-parsed claims")
                 .isEmpty();
+    }
+
+    /**
+     * The half of "sign this device out" that has to happen per request.
+     *
+     * <p>An access token is self-contained and lives fifteen minutes, so revoking the session's
+     * refresh token would leave the device that is being signed out fully authenticated for the
+     * rest of that quarter of an hour — on the one screen where somebody is acting because they
+     * believe a device is compromised. The token therefore carries its session as a {@code sid}
+     * claim and the filter asks about it, exactly as it already asks about the jti blacklist and
+     * the per-user revocation epoch.
+     */
+    @Test
+    void tokenFromARevokedSessionDoesNotAuthenticate() throws Exception {
+        JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        UUID sessionId = UUID.randomUUID();
+        when(blacklistService.isSessionRevoked(sessionId)).thenReturn(true);
+
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
+        String token = jwtUtil.generateAccessToken(
+                UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, sessionId);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + token);
+        FilterChain chain = mock(FilterChain.class);
+
+        SecurityContextHolder.clearContext();
+        try {
+            filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication())
+                    .as("a token whose session has been signed out must leave the request unauthenticated")
+                    .isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    /**
+     * Tokens minted before sessions existed carry no {@code sid}. They must keep working until
+     * they expire — refusing them would have signed out everybody who was logged in across the
+     * upgrade — and must not be treated as belonging to some session.
+     */
+    @Test
+    void tokenWithoutASessionStillAuthenticates() throws Exception {
+        JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
+        String token = jwtUtil.generateAccessToken(
+                UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + token);
+        FilterChain chain = mock(FilterChain.class);
+
+        SecurityContextHolder.clearContext();
+        try {
+            filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+            verify(blacklistService, never()).isSessionRevoked(any());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

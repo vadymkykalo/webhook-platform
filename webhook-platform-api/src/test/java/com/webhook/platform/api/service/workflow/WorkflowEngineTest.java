@@ -48,15 +48,15 @@ class WorkflowEngineTest {
     }
 
     private WorkflowEngine newEngine(List<NodeExecutor> executors) {
-        return newEngine(executors, 600, 30, 60, 60, 305, 30, 16, 5);
+        return newEngine(executors, 600, 30, 60, 60, 30, 16, 5);
     }
 
     private WorkflowEngine newEngine(List<NodeExecutor> executors, int maxDurationSeconds, int defaultTimeoutSeconds,
-                                      int httpTimeoutSeconds, int slackTimeoutSeconds, int delayTimeoutSeconds,
+                                      int httpTimeoutSeconds, int slackTimeoutSeconds,
                                       int createEventTimeoutSeconds, int poolSize, int shutdownAwaitSeconds) {
         WorkflowEngine engine = new WorkflowEngine(executors, persistence, mapper, meterRegistry,
                 maxDurationSeconds, defaultTimeoutSeconds, httpTimeoutSeconds, slackTimeoutSeconds,
-                delayTimeoutSeconds, createEventTimeoutSeconds, poolSize, shutdownAwaitSeconds);
+                createEventTimeoutSeconds, poolSize, shutdownAwaitSeconds);
         enginesToClose.add(engine);
         return engine;
     }
@@ -400,7 +400,7 @@ class WorkflowEngineTest {
         });
 
         // defaultTimeoutSeconds=1 so "slow" (not http/slack/delay/createEvent) times out fast.
-        WorkflowEngine engine = newEngine(List.of(slowNode), 600, 1, 60, 60, 305, 30, 4, 2);
+        WorkflowEngine engine = newEngine(List.of(slowNode), 600, 1, 60, 60, 30, 4, 2);
         UUID executionId = UUID.randomUUID();
 
         long start = System.currentTimeMillis();
@@ -432,7 +432,7 @@ class WorkflowEngineTest {
 
         // maxDurationSeconds=1 (1000ms) but defaultTimeoutSeconds=5 so node n1 itself
         // is allowed to finish its 1.2s sleep — the *global* check trips before n2 starts.
-        WorkflowEngine engine = newEngine(List.of(slowButUnderNodeTimeout, neverRuns), 1, 5, 60, 60, 305, 30, 4, 2);
+        WorkflowEngine engine = newEngine(List.of(slowButUnderNodeTimeout, neverRuns), 1, 5, 60, 60, 30, 4, 2);
         UUID executionId = UUID.randomUUID();
 
         String definition = """

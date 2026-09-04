@@ -23,6 +23,9 @@ public class StuckForwardRecoveryService {
     @Value("${stuck-forward.threshold-minutes:5}")
     private int thresholdMinutes;
 
+    @Value("${stuck-forward.stranded-pending-threshold-minutes:60}")
+    private int strandedPendingThresholdMinutes;
+
     @Scheduled(fixedRateString = "${stuck-forward.check-interval-ms:60000}")
     @Transactional
     public void recoverStuckForwardAttempts() {
@@ -32,6 +35,13 @@ public class StuckForwardRecoveryService {
             if (recovered > 0) {
                 log.warn("Recovered {} stuck incoming forward attempts (PROCESSING > {} minutes)",
                         recovered, thresholdMinutes);
+            }
+
+            Instant strandedThreshold = Instant.now().minusSeconds(strandedPendingThresholdMinutes * 60L);
+            int strandedRecovered = attemptRepository.resetStrandedPendingForwardAttempts(strandedThreshold);
+            if (strandedRecovered > 0) {
+                log.warn("Recovered {} stranded PENDING incoming forward attempts "
+                        + "(next_retry_at NULL > {} minutes)", strandedRecovered, strandedPendingThresholdMinutes);
             }
         });
     }

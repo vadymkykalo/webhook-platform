@@ -21,6 +21,7 @@
 #   - incoming_forward_attempts_total{result=success|failure|error}
 #   - circuit_breaker_state_transitions_total
 #   - circuit_breaker_rejected_total
+#   - circuit_breaker_degraded_total
 #   - http_server_requests_seconds_count{status=~"5.."}
 
 groups:
@@ -231,6 +232,24 @@ groups:
           summary: "Circuit breaker rejecting >10 calls/sec"
           description: |
             Many deliveries being skipped due to open circuit breakers.
+
+      # The breaker cannot trip if it cannot count
+      - alert: CircuitBreakerDegraded
+        expr: |
+          rate(circuit_breaker_degraded_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "Circuit breaker cannot reach Redis"
+          description: |
+            {{ $value | printf "%.2f" }} circuit breaker operations/sec are failing open
+            because Redis is unreachable. Deliveries continue — that is deliberate — but
+            outcomes are not being counted, so no breaker will trip however badly an
+            endpoint behaves. An endpoint that looks healthy right now may only look that
+            way because nothing is measuring it. Check Redis before trusting the breaker
+            dashboards.
 
   # ── API Availability (from SLOs) ─────────────────────────────
   - name: hookflow.api

@@ -3,6 +3,10 @@ package com.webhook.platform.api.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
+import com.webhook.platform.api.service.billing.QuotaCounterService;
+import com.webhook.platform.api.service.billing.EntitlementService;
+import com.webhook.platform.api.exception.QuotaExceededException;
+import com.webhook.platform.api.service.ingress.RateLimitExceededException;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
@@ -79,6 +83,10 @@ class IngressServiceTest {
     private TransactionStatus transactionStatus;
     @Mock
     private ReplayDetectionService replayDetectionService;
+    @Mock
+    private EntitlementService entitlementService;
+    @Mock
+    private QuotaCounterService quotaCounterService;
 
     private IngressService service;
     private WebhookVerifierFactory verifierFactory;
@@ -88,6 +96,8 @@ class IngressServiceTest {
     private static final String ENCRYPTION_SALT = "test_salt";
     private EncryptionKeyRegistry encryptionKeyRegistry;
 
+    private static final int DEFAULT_RATE_LIMIT = 100;
+
     private final UUID sourceId = UUID.randomUUID();
     private final UUID eventId = UUID.randomUUID();
     private final UUID destId = UUID.randomUUID();
@@ -95,8 +105,11 @@ class IngressServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        // Every Source now has a rate limit — its own or the configured default — and the limiter
+        // is fail-closed, so a test that says nothing about it would be rejected before it starts.
+        when(rateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt())).thenReturn(true);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        verifierFactory = new WebhookVerifierFactory();
+        verifierFactory = new WebhookVerifierFactory("http://localhost:8080");
         TrustedProxyResolver clientIpResolver = new TrustedProxyResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
@@ -104,7 +117,7 @@ class IngressServiceTest {
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, new ForwardDispatch(objectMapper), meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
                 clientIpResolver, transactionManager,
-                encryptionKeyRegistry, 524288
+                encryptionKeyRegistry, entitlementService, quotaCounterService, 524288, DEFAULT_RATE_LIMIT
         );
     }
 
@@ -866,5 +879,97 @@ class IngressServiceTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    // ── Metering: the public ingress path is charged like any other ingest ────────────
+
+    @Test
+    void overTheMonthlyQuota_isRejectedWithoutPersistingAnything() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(buildActiveSource()));
+        stubHttpRequest();
+        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
+                .when(entitlementService).checkEventQuota();
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+                .isInstanceOf(QuotaExceededException.class);
+
+        verify(eventRepository, never()).save(any());
+        verify(quotaCounterService, never()).increment();
+    }
+
+    @Test
+    void anAcceptedWebhookChargesTheOrganizationOnce() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(buildActiveSource()));
+        stubHttpRequest();
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.receiveWebhook("validtoken", "{}", httpRequest);
+
+        verify(entitlementService).checkEventQuota();
+        verify(quotaCounterService).increment();
+    }
+
+    /**
+     * The Incoming Event already existed, so nothing new was stored. Charging again would bill
+     * the customer twice for one webhook the provider happened to send twice.
+     */
+    @Test
+    void aDeduplicatedWebhookIsNotChargedAgain() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(buildActiveSource()));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-GitHub-Delivery")).thenReturn("gh-1");
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "gh-1"))
+                .thenReturn(Optional.of(IncomingEvent.builder().id(eventId).incomingSourceId(sourceId).build()));
+
+        service.receiveWebhook("validtoken", "{}", httpRequest);
+
+        verify(eventRepository, never()).save(any());
+        verify(quotaCounterService, never()).increment();
+    }
+
+    // ── Rate limit: a Source that names no limit of its own still has one ─────────────
+
+    @Test
+    void aSourceWithNoRateLimitOfItsOwnFallsBackToTheConfiguredDefault() {
+        IncomingSource source = buildActiveSource();
+        source.setRateLimitPerSecond(null);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT)).thenReturn(true);
+
+        service.receiveWebhook("validtoken", "{}", httpRequest);
+
+        verify(rateLimiterService).tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT);
+    }
+
+    @Test
+    void aSourceWithItsOwnRateLimitKeepsIt() {
+        IncomingSource source = buildActiveSource();
+        source.setRateLimitPerSecond(7);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, 7)).thenReturn(true);
+
+        service.receiveWebhook("validtoken", "{}", httpRequest);
+
+        verify(rateLimiterService).tryAcquireForSourceFailClosed(sourceId, 7);
+    }
+
+    @Test
+    void exceedingTheDefaultRateLimitRejectsTheWebhook() {
+        IncomingSource source = buildActiveSource();
+        source.setRateLimitPerSecond(null);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+                .isInstanceOf(RateLimitExceededException.class);
+        verify(eventRepository, never()).save(any());
     }
 }

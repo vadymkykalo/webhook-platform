@@ -2,6 +2,8 @@ package com.webhook.platform.api.service.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.WorkflowExecution.ExecutionStatus;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
@@ -65,7 +67,6 @@ public class WorkflowEngine implements DisposableBean {
             @Value("${workflow.node-timeout.default-seconds:30}") int defaultTimeoutSeconds,
             @Value("${workflow.node-timeout.http-seconds:60}") int httpTimeoutSeconds,
             @Value("${workflow.node-timeout.slack-seconds:60}") int slackTimeoutSeconds,
-            @Value("${workflow.node-timeout.delay-seconds:305}") int delayTimeoutSeconds,
             @Value("${workflow.node-timeout.create-event-seconds:30}") int createEventTimeoutSeconds,
             @Value("${workflow.node-timeout.pool-size:16}") int nodeTimeoutPoolSize,
             @Value("${workflow.shutdown.await-termination-seconds:30}") int shutdownAwaitSeconds) {
@@ -93,10 +94,12 @@ public class WorkflowEngine implements DisposableBean {
         pool.allowCoreThreadTimeOut(true);
         this.nodeTimeoutPool = pool;
         this.nodeTimeoutExecutor = TenantPropagatingTaskDecorator.wrap(pool);
+        // No "delay" entry any more: a delay node returns a due time in microseconds instead
+        // of sleeping, so the 305-second allowance it needed — and the config knob that set it —
+        // measured something that no longer happens.
         this.nodeTimeouts = Map.of(
                 "http", httpTimeoutSeconds * 1000L,
                 "slack", slackTimeoutSeconds * 1000L,
-                "delay", delayTimeoutSeconds * 1000L,
                 "createEvent", createEventTimeoutSeconds * 1000L
         );
         log.info("WorkflowEngine initialized with {} executors: {}, maxExecution={}s, shutdown={}s",
@@ -126,6 +129,28 @@ public class WorkflowEngine implements DisposableBean {
      * @param triggerData  the trigger event payload
      */
     public void execute(UUID executionId, String definitionJson, JsonNode triggerData) {
+        run(executionId, definitionJson, triggerData, null, 0L);
+    }
+
+    /**
+     * Continues an execution that suspended at a delay node.
+     *
+     * <p>Called by {@code WorkflowResumeJob} once {@code resumeAt} has passed. {@code state} is
+     * the snapshot {@link #execute} wrote — the outputs produced before the delay, the nodes
+     * already skipped, and the node to continue from. Replaying the prefix instead of restoring
+     * it would be the failure mode that makes a naive resume worse than sleeping: an http node
+     * would post twice and a createEvent node would emit twice.
+     *
+     * @param workingMsSoFar milliseconds of actual node execution before the suspension, so the
+     *                       global timeout stays a budget for work rather than wall-clock
+     */
+    public void resume(UUID executionId, String definitionJson, JsonNode triggerData,
+                       JsonNode state, long workingMsSoFar) {
+        run(executionId, definitionJson, triggerData, state, workingMsSoFar);
+    }
+
+    private void run(UUID executionId, String definitionJson, JsonNode triggerData,
+                     JsonNode resumeState, long workingMsSoFar) {
         long startTime = System.currentTimeMillis();
         try {
             JsonNode def = objectMapper.readTree(definitionJson);
@@ -171,13 +196,37 @@ public class WorkflowEngine implements DisposableBean {
                 }
             }
 
-            // Execute nodes in order
+            // Execute nodes in order, from the beginning or from where a suspension left off.
             Map<String, JsonNode> outputs = new HashMap<>();
             Set<String> skippedNodes = new HashSet<>();
+            String resumeFrom = null;
+            if (resumeState != null) {
+                JsonNode savedOutputs = resumeState.get("outputs");
+                if (savedOutputs != null) {
+                    savedOutputs.fields().forEachRemaining(e -> outputs.put(e.getKey(), e.getValue()));
+                }
+                JsonNode savedSkipped = resumeState.get("skipped");
+                if (savedSkipped != null) {
+                    savedSkipped.forEach(n -> skippedNodes.add(n.asText()));
+                }
+                resumeFrom = resumeState.hasNonNull("resumeFrom")
+                        ? resumeState.get("resumeFrom").asText() : null;
+            }
+            boolean skippingToResumePoint = resumeFrom != null;
 
             for (String nodeId : order) {
+                // Everything before the resume point already ran, and its output is restored
+                // above. Re-running it would repeat side effects the execution already had.
+                if (skippingToResumePoint) {
+                    if (nodeId.equals(resumeFrom)) {
+                        skippingToResumePoint = false;
+                    } else {
+                        continue;
+                    }
+                }
+
                 // ── Global timeout check ─────────────────────────
-                long elapsed = System.currentTimeMillis() - startTime;
+                long elapsed = workingMsSoFar + (System.currentTimeMillis() - startTime);
                 if (elapsed > maxExecutionMs) {
                     String msg = String.format("Workflow execution timeout after %ds (max %ds)",
                             elapsed / 1000, maxExecutionMs / 1000);
@@ -262,6 +311,20 @@ public class WorkflowEngine implements DisposableBean {
                 // Save step (single DB write including duration)
                 persistence.saveStep(executionId, nodeId, nodeType, input, result, (int) nodeDuration);
 
+                if (result.status() == StepStatus.WAITING) {
+                    // The node has nothing to do but wait. Write down where we are, hand the
+                    // thread back, and let WorkflowResumeJob pick it up when it is due —
+                    // rather than parking a pool thread on a clock.
+                    outputs.put(nodeId, result.output());
+                    long workedThisSegment = workingMsSoFar + (System.currentTimeMillis() - startTime);
+                    persistence.suspendExecution(executionId, result.resumeAt(),
+                            snapshot(outputs, skippedNodes, nextNodeAfter(order, nodeId)),
+                            workedThisSegment);
+                    log.debug("Execution {} suspended at node {} until {}",
+                            executionId, nodeId, result.resumeAt());
+                    return;
+                }
+
                 if (result.status() == StepStatus.FAILED) {
                     log.warn("Node {} failed ({}ms): {}", nodeId, nodeDuration, result.errorMessage());
                     persistence.completeExecution(executionId, ExecutionStatus.FAILED, result.errorMessage(), startTime);
@@ -288,12 +351,44 @@ public class WorkflowEngine implements DisposableBean {
         }
     }
 
+    /**
+     * The node to continue from, or null when the delay was the last node in the order.
+     *
+     * <p>Null means the resumed run finds nothing left to do and completes, which is the correct
+     * outcome for a workflow that ends on a delay.
+     */
+    private String nextNodeAfter(List<String> order, String nodeId) {
+        int i = order.indexOf(nodeId);
+        return (i >= 0 && i + 1 < order.size()) ? order.get(i + 1) : null;
+    }
+
+    /**
+     * Everything needed to put the execution back together, and no more.
+     *
+     * <p>Deliberately not the whole engine state: the definition and trigger data are already
+     * persisted on the row, and the edge maps are derived from the definition, so re-deriving
+     * them on resume is cheaper than storing them and cannot go stale against an edited
+     * workflow.
+     */
+    private JsonNode snapshot(Map<String, JsonNode> outputs, Set<String> skipped, String resumeFrom) {
+        ObjectNode state = objectMapper.createObjectNode();
+        ObjectNode out = objectMapper.createObjectNode();
+        outputs.forEach(out::set);
+        state.set("outputs", out);
+        ArrayNode skippedArray = objectMapper.createArrayNode();
+        skipped.forEach(skippedArray::add);
+        state.set("skipped", skippedArray);
+        if (resumeFrom != null) {
+            state.put("resumeFrom", resumeFrom);
+        }
+        return state;
+    }
+
     // ── Per-node timeout enforcement ────────────────────────────────────
 
     /**
      * Execute a node with a per-type timeout.
      * If the node takes too long, returns FAILED with a timeout message.
-     * For "delay" nodes, the timeout is generous (305s) since blocking is expected.
      */
     private StepResult executeWithTimeout(NodeExecutor executor, String nodeType,
                                            JsonNode nodeData, JsonNode input) {

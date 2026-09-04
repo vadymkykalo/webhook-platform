@@ -21,11 +21,6 @@ const RULES: Rule[] = [
   { key: 'special', test: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
 
-export function getPasswordStrength(password: string): number {
-  if (!password) return 0;
-  return RULES.filter((r) => r.test(password)).length;
-}
-
 /**
  * Whether every rule the checklist draws is satisfied.
  *

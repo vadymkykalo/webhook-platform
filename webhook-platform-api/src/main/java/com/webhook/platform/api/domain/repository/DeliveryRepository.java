@@ -108,6 +108,22 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId AND d.failedAt >= :since")
     long countDlqByProjectIdSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
 
+    /**
+     * The most recent delivery outcomes for one endpoint, newest first.
+     *
+     * <p>Feeds the CONSECUTIVE_FAILURES alert, which asks whether the last N deliveries all
+     * failed — a question no aggregate answers, because a 90% failure rate and nine failures
+     * in a row are different conditions and only the second one means the receiver is down.
+     *
+     * <p>PENDING and PROCESSING rows are excluded: a delivery still in flight has no outcome
+     * yet, and counting it as "not a failure" would reset the streak every time the endpoint
+     * is busy — which is exactly when the streak matters.
+     */
+    @Query("SELECT d.status FROM Delivery d WHERE d.endpointId = :endpointId "
+            + "AND d.status IN ('SUCCESS', 'FAILED', 'DLQ') ORDER BY d.createdAt DESC")
+    List<DeliveryStatus> findRecentOutcomesByEndpointId(
+            @Param("endpointId") UUID endpointId, Pageable pageable);
+
     @Query("SELECT d.eventId, COUNT(d) FROM Delivery d WHERE d.eventId IN :eventIds GROUP BY d.eventId")
     List<Object[]> countByEventIds(@Param("eventIds") List<UUID> eventIds);
 

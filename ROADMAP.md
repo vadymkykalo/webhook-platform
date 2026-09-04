@@ -17,10 +17,16 @@ disables. So an endpoint whose owner deleted the receiving service goes on consu
 budget, queue depth and delivery rows until a human notices. Svix, Convoy and Hookdeck Outpost
 all disable and notify; this is expected baseline behaviour, not a premium feature.
 
-Most of the parts exist: `AlertType.CONSECUTIVE_FAILURES` already counts the condition,
-`AlertChannel` already reaches email, Slack and a webhook, and `Endpoint.enabled` already
-stops delivery. What is missing is the action that joins them — disable, notify, and give the
-owner a clear way to re-enable once they have fixed their end.
+The parts now exist. `AlertEvaluatorService` measures `AlertType.CONSECUTIVE_FAILURES`
+against an endpoint's trailing run of outcomes and fires once per crossing, `AlertChannel`
+reaches email, Slack and a webhook, and `Endpoint.enabled` stops delivery. What is missing is
+the action that joins them — disable, notify, and give the owner a clear way to re-enable once
+they have fixed their end.
+
+This entry previously claimed `CONSECUTIVE_FAILURES` "already counts the condition". It did
+not: nothing called `AlertService.fireAlert`, all four `AlertType` values were unreferenced
+outside their enum, and every rule a user created was inert. The evaluator that closed that
+gap is what makes the rest of this item the small piece it was always described as.
 
 ### An app portal for the customer's own users
 
@@ -36,13 +42,6 @@ non-Hookflow user, an embeddable surface, and enough theming not to look borrowe
 ## Known gaps, not yet scheduled
 
 Each of these is a real absence, listed so nobody has to discover it mid-evaluation.
-
-**Standard Webhooks.** Signatures are Stripe-shaped — `X-Signature: t=…,v1=…` over
-`<timestamp>.<body>`. The [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks)
-convention (`webhook-id` / `webhook-timestamp` / `webhook-signature`) has been adopted by
-OpenAI, Anthropic, Twilio, PagerDuty and Supabase, and receivers that follow it can verify
-with an off-the-shelf library instead of reading our docs. Additive: both header sets can be
-sent at once, so nothing existing breaks.
 
 **SSO — SAML and OIDC.** Not implemented, and deliberately not advertised:
 `V059__drop_unimplemented_sso_feature_flag.sql` removed the plan flag that claimed it. A hard
@@ -70,9 +69,6 @@ direction has no filtering at all — every incoming event goes to every enabled
 
 **No batching**, no static egress IPs, no PagerDuty or OpsGenie channel, no cold-storage
 archival. MinIO is present in the Compose file but nothing consumes it yet.
-
-**An organization switcher.** A user belonging to two organizations gets the oldest one on
-login; there is no way to change it without a second account.
 
 ## Deliberately not planned
 

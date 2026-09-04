@@ -31,6 +31,7 @@ const BillingPage = lazy(() => import('./pages/BillingPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const ReplayPage = lazy(() => import('./pages/ReplayPage'));
 const DlqPage = lazy(() => import('./pages/DlqPage'));
+const IncomingDlqPage = lazy(() => import('./pages/IncomingDlqPage'));
 const TestEndpointsPage = lazy(() => import('./pages/TestEndpointsPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
@@ -130,6 +131,11 @@ export const router = createBrowserRouter([
     path: '/docs/:sectionId',
     element: <S><DocumentationPage /></S>,
   },
+  /* No child route below states a role. `/admin` requires a session, and what
+     each destination requires beyond that is declared once in nav.config's
+     `requiredRoleFor` — which AppLayout applies around the outlet, and which the
+     sidebar and tab strip filter from. Two hand-kept lists is how the personal
+     profile page came to be shown to everyone and guarded at OWNER. */
   {
     path: '/admin',
     element: (
@@ -181,6 +187,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/dlq',
         element: <S><DlqPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/incoming-dlq',
+        element: <S><IncomingDlqPage /></S>,
       },
       {
         path: 'projects/:projectId/test-endpoints',
@@ -264,7 +274,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'members',
-        element: <ProtectedRoute requiredRole="OWNER"><S><MembersPage /></S></ProtectedRoute>,
+        element: <S><MembersPage /></S>,
       },
       {
         path: 'audit-log',
@@ -272,15 +282,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <ProtectedRoute requiredRole="OWNER"><S><SettingsPage /></S></ProtectedRoute>,
+        element: <S><SettingsPage /></S>,
       },
       {
         path: 'org-settings',
-        element: <ProtectedRoute requiredRole="OWNER"><S><OrgSettingsPage /></S></ProtectedRoute>,
+        element: <S><OrgSettingsPage /></S>,
       },
       {
         path: 'billing',
-        element: <ProtectedRoute requiredRole="OWNER"><S><BillingPage /></S></ProtectedRoute>,
+        element: <S><BillingPage /></S>,
       },
       {
         path: '*',

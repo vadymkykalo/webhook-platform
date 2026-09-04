@@ -29,6 +29,7 @@ Self-hosted webhook infrastructure platform for Kubernetes.
 ```bash
 # Generate random secrets
 ENCRYPTION_KEY=$(openssl rand -base64 32)
+ENCRYPTION_SALT=$(openssl rand -base64 24)
 JWT_SECRET=$(openssl rand -base64 64)
 DB_PASSWORD=$(openssl rand -base64 32)
 REDIS_PASSWORD=$(openssl rand -base64 32)
@@ -36,6 +37,7 @@ REDIS_PASSWORD=$(openssl rand -base64 32)
 # Create Kubernetes secrets
 kubectl create secret generic hookflow-secrets \
   --from-literal=encryption-key="$ENCRYPTION_KEY" \
+  --from-literal=encryption-salt="$ENCRYPTION_SALT" \
   --from-literal=jwt-secret="$JWT_SECRET"
 
 kubectl create secret generic hookflow-postgresql-secret \
@@ -44,6 +46,17 @@ kubectl create secret generic hookflow-postgresql-secret \
 kubectl create secret generic hookflow-redis-secret \
   --from-literal=password="$REDIS_PASSWORD"
 ```
+
+All three keys in `hookflow-secrets` are required: `encryption-key` and
+`encryption-salt` together derive the key every endpoint secret in the database
+is encrypted with, and both apps declare them with no default — a release
+missing either gives you CrashLooping api and worker pods, not a degraded mode.
+
+**Back these up, and never rotate `encryption-salt` in place.** It is an input
+to the key derivation, so changing it makes every secret already stored decrypt
+to garbage; a database backup restored without the same salt is unreadable.
+`secrets.encryptionKey` / `secrets.encryptionSalt` / `secrets.jwtSecret` in
+`values.yaml` point at the Secret name and key if you keep them somewhere else.
 
 ### 2. Configure external services
 
@@ -72,7 +85,55 @@ redis:
     existingSecret: hookflow-redis-secret
 ```
 
-### 3. Install chart
+### 3. Set the URL people will type
+
+Verification, password-reset and invite links are built from `app.baseUrl`, and
+`app.corsAllowedOrigins` (which defaults to it) is what the browser is allowed
+to call the API from. Leave both empty and the chart derives them from the first
+`ui.ingress` host — `https://…` when TLS is configured — so an install that sets
+its ingress host needs nothing further:
+
+```yaml
+app:
+  baseUrl: "https://app.hookflow.yourdomain.com"
+```
+
+Set it explicitly when browsers reach Hookflow by some other name than the
+ingress host. With no ingress and no `app.baseUrl` the fallback is the in-cluster
+UI Service, which is not an address anyone can follow from a mailbox.
+
+`api.env.APP_ENV` is `production` by default, and `ProductionSafetyValidator`
+then *refuses to start* if CORS still names localhost — so this is a startup
+requirement, not a cosmetic one.
+
+### 4. Configure email (optional, but on in production)
+
+With email off, accounts are created already verified and nobody can be invited
+to an organization. `values-production.yaml` turns it on, which means it needs a
+relay:
+
+```yaml
+email:
+  enabled: true
+  from: noreply@hookflow.yourdomain.com
+  smtp:
+    host: smtp.example.com
+    port: 587
+    username: hookflow@example.com
+    auth: true
+    starttls: true
+    existingSecret: hookflow-smtp-secret      # key: smtp-password
+```
+
+```bash
+kubectl create secret generic hookflow-smtp-secret \
+  --from-literal=smtp-password="$SMTP_PASSWORD"
+```
+
+`email.enabled: true` with an empty `smtp.host` is worse than leaving mail off:
+signup accepts the account and then cannot deliver the verification link.
+
+### 5. Install chart
 
 ```bash
 # Both dev and production need external.* set for postgresql/kafka/redis -
@@ -91,7 +152,7 @@ helm install hookflow ./hookflow -f values-production.yaml \
   --set ui.ingress.hosts[0].host=app.hookflow.yourdomain.com
 ```
 
-### 4. Access the UI
+### 6. Access the UI
 
 ```bash
 # Port-forward (development)
@@ -140,9 +201,11 @@ See `values-production.yaml` for production-ready defaults:
 
 - 3+ replicas for API and Worker
 - HPA enabled with conservative targets
-- PodDisruptionBudgets for HA
+- PodDisruptionBudgets for HA (`api.pdb` / `worker.pdb` / `ui.pdb`; `minAvailable`
+  by default, `maxUnavailable` if you set it instead)
 - Network policies enabled
 - Pod anti-affinity for zone distribution
+- Transactional email on — which needs an SMTP relay, see step 4 above
 
 ```bash
 helm install hookflow ./hookflow -f values-production.yaml
@@ -150,11 +213,17 @@ helm install hookflow ./hookflow -f values-production.yaml
 
 ## Database Migrations
 
-Flyway migrations run automatically via an **init container** before the API pod starts.
-This ensures:
-- Migrations complete before the app accepts traffic
-- Only one pod runs migrations at a time (Flyway's built-in locking)
-- Worker pods wait for API migration to finish before starting
+Flyway migrations run inside the API pod at startup, before it reports ready.
+Replicas starting together serialise on a PostgreSQL advisory lock — Flyway's
+own — so exactly one of them applies a given migration and the rest wait for it.
+That is the same mechanism `docker-compose.yml` relies on.
+
+This used to be described as an init container, and there was one; it could
+never have worked. It ran the whole API jar with a `run-migration-only` flag no
+code reads, without the encryption and JWT secrets the app requires to start,
+and with nothing to make the JVM exit once Flyway had finished. See the comment
+in `templates/api-deployment.yaml`. A separate migration step needs a jar entry
+point that migrates and exits; there isn't one yet.
 
 ## Automated Backups
 
@@ -193,11 +262,23 @@ helm upgrade hookflow ./hookflow
 
 ## Monitoring
 
-API and Worker expose Actuator endpoints:
+API and Worker serve Actuator on a **management port of their own** — 8082 for
+the API, 8081 for the worker, the same split `docker-compose.yml` makes — not on
+the port that serves traffic:
 
 - `/actuator/health/liveness` - Liveness probe
 - `/actuator/health/readiness` - Readiness probe
-- `/actuator/prometheus` - Prometheus metrics (if enabled)
+- `/actuator/prometheus` - Prometheus metrics
+
+Both Services expose that port as `management`, and `monitoring.serviceMonitor`
+scrapes it by that name. The split is what makes metrics reachable at all: on the
+main port `/actuator/prometheus` goes through the authenticated filter chain and
+answers 401, so every scrape failed and the shipped alert rules fired on absent
+data. Nothing publishes the management port outside the cluster.
+
+There is nothing further to switch on for `networkPolicy.enabled` installs: the
+policies admit the management port from any namespace, since Prometheus normally
+runs in its own.
 
 ## Uninstall
 

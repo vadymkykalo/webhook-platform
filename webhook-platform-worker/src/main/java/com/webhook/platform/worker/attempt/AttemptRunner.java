@@ -136,35 +136,62 @@ public class AttemptRunner {
             log.error("{}: request failed: {}", ctx.description(), e.getMessage());
             fail(store, metrics, claim, ctx, e.getMessage(), requestHeaders, body, elapsed(startedAt));
         } finally {
-            concurrencyControl.release(ctx.targetKey());
+            concurrencyControl.releaseForTarget(ctx.targetKey());
+            concurrencyControl.releaseForTenant(ctx.tenantKey());
         }
     }
 
     /**
-     * The three limits, in the order a rejection is cheapest to discover. Returns true with a
-     * concurrency permit held; false having already finalised the obligation as deferred.
+     * The five limits. Returns true holding both concurrency permits; false having already
+     * finalised the obligation as deferred and given back whatever it took.
+     *
+     * <p>Ordered by what a refusal costs to undo, not by what it costs to discover. A
+     * concurrency permit can be handed back; a rate-limit token cannot be un-consumed. So the
+     * releasable checks run first and the consuming ones last — otherwise an attempt refused on
+     * concurrency had already spent the tenant's budget, and under concurrency pressure, which
+     * is exactly when deferrals happen, a tenant got less throughput than it was configured for
+     * with nothing to explain why.
+     *
+     * <p>The tenant cap is the one that makes this multi-tenant. The per-target cap bounds one
+     * receiver to a slice of the pool, which does nothing about an organization with twenty slow
+     * receivers: each stays inside its own slice and their sum is the entire worker, so everyone
+     * else stops being delivered to. The breaker eventually notices a slow target, but it needs
+     * a handful of calls per target to trip, and that window widens with every endpoint the
+     * tenant owns.
      */
     private <C> boolean admit(AttemptStore<C> store, C claim, AttemptContext ctx) {
-        if (!tenantRateLimiter.tryAcquire(ctx.tenantKey())) {
-            return defer(store, claim, ctx, 1, 30, "tenant rate limit exceeded");
-        }
-
         if (!circuitBreaker.isCallPermitted(ctx.targetKey())) {
             // Recorded though nothing was sent: a quiet target should show the breaker.
             store.recordAttempt(claim, errorRecord(null, null, "CIRCUIT_BREAKER_OPEN", 0));
             return defer(store, claim, ctx, "circuit breaker open", Instant.now().plusSeconds(30));
         }
 
-        Integer perTarget = ctx.targetRateLimitPerSecond();
-        if (perTarget != null && !targetRateLimiter.tryAcquire(ctx.targetKey(), perTarget)) {
-            return defer(store, claim, ctx, 2, 60, "target rate limit exceeded");
+        if (!concurrencyControl.tryAcquireForTenant(ctx.tenantKey())) {
+            return defer(store, claim, ctx, 2, 60, "tenant concurrency limit reached");
         }
 
-        if (!concurrencyControl.tryAcquire(ctx.targetKey())) {
+        if (!concurrencyControl.tryAcquireForTarget(ctx.targetKey())) {
+            concurrencyControl.releaseForTenant(ctx.tenantKey());
             return defer(store, claim, ctx, 2, 60, "target concurrency limit reached");
         }
 
+        if (!tenantRateLimiter.tryAcquire(ctx.tenantKey())) {
+            releaseBothPermits(ctx);
+            return defer(store, claim, ctx, 1, 30, "tenant rate limit exceeded");
+        }
+
+        Integer perTarget = ctx.targetRateLimitPerSecond();
+        if (perTarget != null && !targetRateLimiter.tryAcquire(ctx.targetKey(), perTarget)) {
+            releaseBothPermits(ctx);
+            return defer(store, claim, ctx, 2, 60, "target rate limit exceeded");
+        }
+
         return true;
+    }
+
+    private void releaseBothPermits(AttemptContext ctx) {
+        concurrencyControl.releaseForTarget(ctx.targetKey());
+        concurrencyControl.releaseForTenant(ctx.tenantKey());
     }
 
     /** Ends the obligation for good, releasing what it held — under invariant 2, as a successor is. */

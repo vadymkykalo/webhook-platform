@@ -14,6 +14,11 @@ export interface EventResponse {
   type: string;
   createdAt: string;
   deliveriesCreated: number;
+  /**
+   * Schema-validation errors this event was accepted despite, when the project has schema
+   * validation on with the WARN policy. Absent when the payload matched or validation is off.
+   */
+  schemaWarnings?: string[];
 }
 
 export interface Endpoint {
@@ -179,7 +184,7 @@ export interface WebhookEvent {
 
 // ── Incoming Webhooks ──
 
-export type ProviderType = 'GENERIC' | 'STRIPE' | 'GITHUB' | 'TWILIO' | 'SHOPIFY' | 'HUBSPOT' | 'SLACK' | 'CUSTOM';
+export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';

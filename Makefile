@@ -126,7 +126,7 @@ down-pull: ## Stop pull-based services (keeps data)
 
 down: ## Stop services (keeps data)
 	@echo "$(YELLOW)Stopping services...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db down 2>/dev/null || true
 	@echo "$(GREEN)Services stopped$(NC)"
 
 stop: ## Stop services (alias for down)
@@ -134,7 +134,7 @@ stop: ## Stop services (alias for down)
 
 clean: ## Stop services and remove containers (keeps volumes)
 	@echo "$(YELLOW)Cleaning up containers...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down --remove-orphans 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db down --remove-orphans 2>/dev/null || true
 	@echo "$(GREEN)Cleanup complete (volumes preserved)$(NC)"
 
 ##@ Build
@@ -146,7 +146,7 @@ rebuild: ## Rebuild and restart services (embedded DB)
 	@echo "$(GREEN)Rebuilding services...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
-	@$(DOCKER_COMPOSE) --profile embedded-db up -d
+	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db up -d
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Rebuild complete$(NC)"
@@ -155,28 +155,36 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 	@echo "$(GREEN)Rebuilding services (external DB mode)...$(NC)"
 	@$(DOCKER_COMPOSE) down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
-	@$(DOCKER_COMPOSE) up -d
+	@$(DOCKER_COMPOSE_BUILD) up -d
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Rebuild complete$(NC)"
 
 ##@ Development (Fast Rebuilds)
+# Every target below builds through DOCKER_COMPOSE_BUILD *and starts through it
+# too*. The overlay does not only add build contexts — it renames the images
+# (`image: webhook-platform-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
+# overlay followed by an `up -d` through the base file built one image and
+# started another: the published ghcr one, silently, with none of your changes.
+# `make dev-ui` looked like it worked and served five-day-old code.
+# The scale-* targets below deliberately stay on the base file: a production
+# host scaling replicas has no locally built image to start.
 rebuild-api: ## Rebuild only API service (fast)
 	@echo "$(GREEN)Rebuilding API...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache api
-	@$(DOCKER_COMPOSE) up -d api
+	@$(DOCKER_COMPOSE_BUILD) up -d api
 	@echo "$(GREEN) API rebuilt and restarted$(NC)"
 
 rebuild-worker: ## Rebuild only Worker service (fast)
 	@echo "$(GREEN)Rebuilding Worker...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache worker
-	@$(DOCKER_COMPOSE) up -d worker
+	@$(DOCKER_COMPOSE_BUILD) up -d worker
 	@echo "$(GREEN) Worker rebuilt and restarted$(NC)"
 
 rebuild-ui: ## Rebuild only UI service (fast)
 	@echo "$(GREEN)Rebuilding UI...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache ui
-	@$(DOCKER_COMPOSE) up -d ui
+	@$(DOCKER_COMPOSE_BUILD) up -d ui
 	@echo "$(GREEN) UI rebuilt and restarted$(NC)"
 
 restart-api: ## Restart API service (no rebuild)
@@ -197,21 +205,21 @@ restart-ui: ## Restart UI service (no rebuild)
 dev-api: ## Quick dev: rebuild API with cache + restart
 	@echo "$(GREEN)Quick rebuild API (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build api
-	@$(DOCKER_COMPOSE) up -d api
+	@$(DOCKER_COMPOSE_BUILD) up -d api
 	@echo "$(GREEN) API ready$(NC)"
 	@$(MAKE) logs-api
 
 dev-worker: ## Quick dev: rebuild Worker with cache + restart
 	@echo "$(GREEN)Quick rebuild Worker (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build worker
-	@$(DOCKER_COMPOSE) up -d worker
+	@$(DOCKER_COMPOSE_BUILD) up -d worker
 	@echo "$(GREEN) Worker ready$(NC)"
 	@$(MAKE) logs-worker
 
 dev-ui: ## Quick dev: rebuild UI with cache + restart
 	@echo "$(GREEN)Quick rebuild UI (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build ui
-	@$(DOCKER_COMPOSE) up -d ui
+	@$(DOCKER_COMPOSE_BUILD) up -d ui
 	@echo "$(GREEN) UI ready$(NC)"
 	@$(MAKE) logs-ui
 
@@ -249,16 +257,11 @@ scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 	@$(DOCKER_COMPOSE) up -d --scale worker=$(N) --no-recreate
 	@echo "$(GREEN)Worker scaled to $(N) instances$(NC)"
 
-# api normally binds a single fixed host port (127.0.0.1:${API_PORT}:8080) so a
-# human can curl it directly — Compose refuses to scale a service past 1 replica
-# while that fixed host port is bound. Passing API_PORT= (empty, not
-# unset) collapses that mapping to an auto-assigned ephemeral port per replica
-# instead — see the API_PORT comment in docker-compose.yml for why this is an
-# env var trick rather than a `-f docker-compose.scale.yml` overlay (Compose
-# concatenates `ports:` lists across -f files instead of replacing them, so an
-# overlay can't actually remove the fixed mapping). Traffic still reaches every
-# replica because the UI's nginx proxies to `api:8080` by Compose DNS, which
-# round-robins across all replicas on its own.
+# api publishes no host port, so nothing blocks Compose from running several
+# replicas of it — the API_PORT= trick this comment used to describe was working
+# around a fixed 127.0.0.1:8080 mapping that the file no longer has. Traffic
+# reaches every replica because the UI's nginx proxies to `api:8080` by Compose
+# DNS, which round-robins across all of them on its own.
 scale-api: ## Scale API instances (usage: make scale-api N=3)
 	@if [ -z "$(N)" ]; then \
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
@@ -266,7 +269,7 @@ scale-api: ## Scale API instances (usage: make scale-api N=3)
 	fi
 	@echo "$(GREEN)Scaling api to $(N) instances (nginx load-balances across them)...$(NC)"
 	@$(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
-	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' shows each replica's assigned port$(NC)"
+	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' lists the replicas$(NC)"
 
 ##@ Release
 version-check: ## Fail if pom/Chart/UI/SDK versions disagree (same check CI runs)
@@ -482,7 +485,7 @@ nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 	@echo "$(RED)Stopping monitoring stack...$(NC)"
 	@$(MONITORING_COMPOSE) down -v --remove-orphans 2>/dev/null || true
 	@echo "$(RED)Stopping main platform...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down -v --remove-orphans --rmi local 2>/dev/null || true
-	@docker volume rm webhook_pgdata kafka_data redis_data minio_data 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db down -v --remove-orphans --rmi local 2>/dev/null || true
+	@docker volume rm webhook_pgdata kafka_data redis_data 2>/dev/null || true
 	@docker network rm webhook-platform_webhook-network 2>/dev/null || true
 	@echo "$(GREEN)Nuclear option complete — platform + monitoring destroyed$(NC)"

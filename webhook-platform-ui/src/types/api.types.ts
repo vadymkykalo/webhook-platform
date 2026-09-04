@@ -39,6 +39,12 @@ export interface CurrentUserResponse {
   user: UserResponse;
   organization: OrganizationResponse;
   role: 'OWNER' | 'DEVELOPER' | 'VIEWER';
+  /**
+   * Whether this deployment can deliver mail. False is the shipped default
+   * (`EMAIL_ENABLED=false`), and where it is false the product must not claim an
+   * invite or a reset "was sent" — it wasn't.
+   */
+  emailDeliveryEnabled: boolean;
 }
 
 export interface OrganizationResponse {
@@ -145,6 +151,8 @@ export interface EventResponse {
   payload: string;
   createdAt: string;
   deliveriesCreated?: number;
+  /** Set only on a test-event response, and only under a project whose policy is WARN. */
+  schemaWarnings?: string[];
 }
 
 export interface SubscriptionResponse {
@@ -159,7 +167,7 @@ export interface SubscriptionResponse {
 
 // ─── Incoming Webhooks ──────────────────────────────────────────────
 
-export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO' | 'CUSTOM';
+export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';
@@ -205,7 +213,8 @@ export interface IncomingDestinationRequest {
   timeoutSeconds?: number;
   retryDelays?: string;
   payloadTransform?: string;
-  transformationId?: string | null;
+  /** A UUID, or '' to detach the destination from its transformation template. */
+  transformationId?: string;
 }
 
 export interface IncomingDestinationResponse {
@@ -254,12 +263,41 @@ export interface IncomingForwardAttemptResponse {
   status: ForwardAttemptStatus;
   startedAt?: string;
   finishedAt?: string;
+  requestHeadersJson?: string;
+  requestBodySnippet?: string;
   responseCode?: number;
   responseHeadersJson?: string;
   responseBodySnippet?: string;
   errorMessage?: string;
   nextRetryAt?: string;
   createdAt: string;
+}
+
+/** Statistics for either direction's DLQ; the backend returns one shape for both. */
+export interface DlqStatsResponse {
+  totalItems: number;
+  last24Hours: number;
+  last7Days: number;
+}
+
+/** One abandoned Forward: a Destination and an Incoming Event, keyed on the Attempt row. */
+export interface IncomingDlqItemResponse {
+  forwardAttemptId: string;
+  incomingEventId: string;
+  destinationId: string;
+  incomingSourceId?: string;
+  sourceName?: string;
+  destinationUrl?: string;
+  attemptNumber?: number;
+  maxAttempts?: number;
+  responseCode?: number;
+  lastError?: string;
+  failedAt?: string;
+  createdAt?: string;
+}
+
+export interface IncomingDlqRetryRequest {
+  forwardAttemptIds: string[];
 }
 
 export interface ReplayEventResponse {

@@ -3,22 +3,14 @@ import { Send, Radio, ArrowLeftRight, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
+import type { Track } from '../lib/onboarding';
 
-export type WebhookIntent = 'send' | 'receive' | 'both';
-
-const INTENT_SEEN_KEY = 'hookflow_intent_seen';
-const INTENT_VALUE_KEY = 'hookflow_intent';
-
-export function hasSeenIntentPicker(): boolean {
-  return localStorage.getItem(INTENT_SEEN_KEY) === 'true';
-}
-
-export function getStoredIntent(): WebhookIntent | null {
-  return localStorage.getItem(INTENT_VALUE_KEY) as WebhookIntent | null;
-}
+export type WebhookIntent = Track;
 
 interface IntentPickerProps {
   onSelect: (intent: WebhookIntent) => void;
+  /** The answer already on record, when the picker is re-asking. */
+  value?: WebhookIntent | null;
 }
 
 /**
@@ -32,15 +24,18 @@ const INTENTS: { key: WebhookIntent; icon: React.ElementType }[] = [
   { key: 'both', icon: ArrowLeftRight },
 ];
 
-export default function IntentPicker({ onSelect }: IntentPickerProps) {
+export default function IntentPicker({ onSelect, value = null }: IntentPickerProps) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<WebhookIntent | null>(null);
+  const [selected, setSelected] = useState<WebhookIntent | null>(value);
 
+  /**
+   * The picker asks; it does not remember. It used to write two localStorage
+   * keys of its own, and both callers then ignored the answer — which is how
+   * the question came to be asked and thrown away. Storage lives in
+   * `src/lib/onboarding.ts` now, and the caller decides what the answer means.
+   */
   const handleContinue = () => {
-    if (!selected) return;
-    localStorage.setItem(INTENT_SEEN_KEY, 'true');
-    localStorage.setItem(INTENT_VALUE_KEY, selected);
-    onSelect(selected);
+    if (selected) onSelect(selected);
   };
 
   return (

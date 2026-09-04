@@ -1581,7 +1581,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/IngressResponse"
         "429":
-          description: Rate limit exceeded
+          description: Rate limit or monthly event quota exceeded
           content:
             '*/*':
               schema:
@@ -2718,6 +2718,67 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}/retry:
+    post:
+      tags:
+      - Dead Letter Queue
+      summary: Retry single incoming DLQ item
+      description: Re-forwards one abandoned forward to the destination that failed
+      operationId: retryIncomingDlqItem
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: forwardAttemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Forward queued for retry
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqActionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/retry:
+    post:
+      tags:
+      - Dead Letter Queue
+      summary: Bulk retry incoming DLQ items
+      description: "Re-forwards several abandoned forwards, each to the destination\
+        \ that failed"
+      operationId: retryIncomingDlqItems
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncomingDlqRetryRequest"
+        required: true
+      responses:
+        "200":
+          description: Forwards queued for retry
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqActionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/incidents:
     get:
       tags:
@@ -3326,6 +3387,44 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate:
+    post:
+      tags:
+      - API Keys
+      summary: Rotate API key
+      description: "Issues a replacement key and puts the old one into a grace window,\
+        \ during which both authenticate. The replacement is shown only once. Default\
+        \ window is 24 hours; pass gracePeriodHours=0 to cut the old key off immediately\
+        \ after a suspected leak."
+      operationId: rotateApiKey
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: apiKeyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyRotateRequest"
+      responses:
+        "201":
+          description: Replacement key created; the old key is retiring
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/alerts/rules:
     get:
       tags:
@@ -3491,6 +3590,101 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/orgs/{orgId}/members/{userId}/suspend:
+    post:
+      tags:
+      - Organizations
+      summary: Suspend member
+      description: "Suspends a member: the membership and its role are kept, the member\
+        \ is refused access, and their current sessions end immediately"
+      operationId: suspendMember
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Member suspended
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/orgs/{orgId}/members/{userId}/reinstate:
+    post:
+      tags:
+      - Organizations
+      summary: Reinstate member
+      description: "Lifts a suspension, restoring the member's access in the role\
+        \ they kept"
+      operationId: reinstateMember
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Member reinstated
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/orgs/{orgId}/members/{userId}/invite:
+    post:
+      tags:
+      - Organizations
+      summary: Re-issue invite
+      description: "Issues a fresh invite token for a member whose invite is still\
+        \ pending, replacing the previous one and restarting its 48-hour expiry. The\
+        \ accept-invite link is returned so an owner can pass it on when email delivery\
+        \ is not configured."
+      operationId: reissueInvite
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Invite re-issued
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/orgs/{orgId}/members/accept-invite:
     post:
       tags:
@@ -3547,7 +3741,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/EventIngestResponse"
         "401":
           description: Invalid or missing API key
           content:
@@ -3559,7 +3753,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - apiKey: []
   /api/v1/deliveries/{id}/replay:
@@ -3725,6 +3919,64 @@ paths:
           description: Email verified successfully
         "400":
           description: Invalid or expired token
+  /api/v1/auth/switch-organization:
+    post:
+      tags:
+      - Authentication
+      summary: Switch organization
+      description: "Re-issues an access token scoped to another organization the caller\
+        \ belongs to. The refresh token is untouched and no other session is affected;\
+        \ the new token's role comes from the membership in the target organization,\
+        \ not from the token being replaced."
+      operationId: switchOrganization
+      parameters:
+      - name: refresh_token
+        in: cookie
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwitchOrganizationRequest"
+        required: true
+      responses:
+        "200":
+          description: Access token re-issued for the target organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: "Not authenticated, or no live session"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "403":
+          description: Caller is not a member of that organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/auth/sessions/revoke-all:
+    post:
+      tags:
+      - Authentication
+      summary: Sign out everywhere
+      description: "Ends every session for the authenticated user, including the one\
+        \ making the call."
+      operationId: revokeAllSessions
+      responses:
+        "204":
+          description: All sessions revoked
+        "401":
+          description: Not authenticated
+      security:
+      - bearerAuth: []
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -3930,6 +4182,28 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuthResponse"
+  /api/v1/auth/device/deny:
+    post:
+      tags:
+      - Device Authentication
+      summary: Deny device code
+      description: Called by the authenticated user in the browser to refuse a device
+        login request they did not start. The waiting CLI stops with 403 on its next
+        poll instead of holding the code open until it expires.
+      operationId: denyDeviceCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceDenyRequest"
+        required: true
+      responses:
+        "200":
+          description: Device code denied
+        "404":
+          description: Code not found or already used
+      security:
+      - bearerAuth: []
   /api/v1/auth/device/code:
     post:
       tags:
@@ -4754,6 +5028,128 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq:
+    get:
+      tags:
+      - Dead Letter Queue
+      summary: List incoming DLQ items
+      description: Returns paginated list of abandoned forwards in the incoming DLQ
+      operationId: listIncomingDlqItems
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: destinationId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageIncomingDlqItemResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+    delete:
+      tags:
+      - Dead Letter Queue
+      summary: Purge all incoming DLQ items
+      description: Permanently deletes every abandoned forward in the project's incoming
+        DLQ
+      operationId: purgeIncomingDlq
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Incoming DLQ purged
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqActionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}:
+    get:
+      tags:
+      - Dead Letter Queue
+      summary: Get incoming DLQ item details
+      description: Returns details of a single abandoned forward
+      operationId: getIncomingDlqItem
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: forwardAttemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingDlqItemResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/stats:
+    get:
+      tags:
+      - Dead Letter Queue
+      summary: Get incoming DLQ stats
+      description: Returns incoming DLQ statistics for the project
+      operationId: getIncomingDlqStats
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqStatsResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/incidents/open-count:
     get:
       tags:
@@ -5497,6 +5893,40 @@ paths:
                   $ref: "#/components/schemas/InvoiceResponse"
       security:
       - bearerAuth: []
+  /api/v1/auth/sessions:
+    get:
+      tags:
+      - Authentication
+      summary: List active sessions
+      description: Returns every live sign-in for the authenticated user — browser
+        sessions and CLI device-code grants alike — with the session making the request
+        flagged as current. No token material is returned.
+      operationId: listSessions
+      parameters:
+      - name: refresh_token
+        in: cookie
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Sessions returned
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionResponse"
+        "401":
+          description: Not authenticated
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionResponse"
+      security:
+      - bearerAuth: []
   /api/v1/auth/me:
     get:
       tags:
@@ -5706,6 +6136,31 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/auth/sessions/{sessionId}:
+    delete:
+      tags:
+      - Authentication
+      summary: Revoke a session
+      description: "Signs one device out. The session's refresh token stops working\
+        \ and so does the access token it already issued, rather than surviving until\
+        \ its own expiry."
+      operationId: revokeSession
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          description: Not authenticated
+        "404":
+          description: No such session for this user
+      security:
+      - bearerAuth: []
 components:
   schemas:
     WebhookCaptureResponse:
@@ -6302,7 +6757,8 @@ components:
           type: string
           format: uuid
           description: ID of a reusable transformation template to apply (overrides
-            payloadTransform if set)
+            payloadTransform if set). Empty string detaches the destination from its
+            template.
       required:
       - url
     IncomingDestinationResponse:
@@ -6378,7 +6834,6 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
-          - CUSTOM
           example: GITHUB
         status:
           type: string
@@ -6439,7 +6894,6 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
-          - CUSTOM
         status:
           type: string
           enum:
@@ -6566,8 +7020,9 @@ components:
         rateLimitPerSecond:
           type: integer
           format: int32
+          description: Per-endpoint delivery throttle. 0 removes the limit.
           maximum: 10000
-          minimum: 1
+          minimum: 0
         allowedSourceIps:
           type: string
         signatureScheme:
@@ -6933,6 +7388,7 @@ components:
           - SUCCESS
           - FAILED
           - SKIPPED
+          - WAITING
         inputData: {}
         outputData: {}
         errorMessage:
@@ -6965,6 +7421,7 @@ components:
           type: string
           enum:
           - RUNNING
+          - WAITING
           - COMPLETED
           - FAILED
           - CANCELLED
@@ -7125,6 +7582,13 @@ components:
           minLength: 1
         compatibilityMode:
           type: string
+          description: "Compatibility promise checked against the previous version.\
+            \ Defaults to the previous version's mode, or NONE for the first version."
+          enum:
+          - NONE
+          - BACKWARD
+          - FORWARD
+          - FULL
         description:
           type: string
       required:
@@ -7149,6 +7613,11 @@ components:
           type: string
         compatibilityMode:
           type: string
+          enum:
+          - NONE
+          - BACKWARD
+          - FORWARD
+          - FULL
         description:
           type: string
         createdBy:
@@ -7340,6 +7809,29 @@ components:
           type: integer
           format: int32
           description: Total forward attempts created across all events
+    DlqActionResponse:
+      type: object
+      properties:
+        retried:
+          type: integer
+          format: int32
+        requested:
+          type: integer
+          format: int32
+        purged:
+          type: integer
+          format: int32
+    IncomingDlqRetryRequest:
+      type: object
+      properties:
+        forwardAttemptIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+      required:
+      - forwardAttemptIds
     TimelineEntryRequest:
       type: object
       properties:
@@ -7430,6 +7922,10 @@ components:
         deliveriesCreated:
           type: integer
           format: int32
+        schemaWarnings:
+          type: array
+          items:
+            type: string
     VerificationResponse:
       type: object
       properties:
@@ -7475,18 +7971,6 @@ components:
       required:
       - clientCert
       - clientKey
-    DlqActionResponse:
-      type: object
-      properties:
-        retried:
-          type: integer
-          format: int32
-        requested:
-          type: integer
-          format: int32
-        purged:
-          type: integer
-          format: int32
     DlqRetryRequest:
       type: object
       properties:
@@ -7544,6 +8028,23 @@ components:
           type: string
         key:
           type: string
+        rotatedAt:
+          type: string
+          format: date-time
+        replacedById:
+          type: string
+          format: uuid
+    ApiKeyRotateRequest:
+      type: object
+      properties:
+        gracePeriodHours:
+          type: integer
+          format: int32
+          maximum: 168
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
     AddMemberRequest:
       type: object
       properties:
@@ -7585,6 +8086,43 @@ components:
         createdAt:
           type: string
           format: date-time
+        inviteExpiresAt:
+          type: string
+          format: date-time
+        inviteUrl:
+          type: string
+    EventIngestResponse:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deliveriesCreated:
+          type: integer
+          format: int32
+        schemaWarnings:
+          type: array
+          items:
+            type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        status:
+          type: integer
+          format: int32
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: string
     BulkReplayRequest:
       type: object
       properties:
@@ -7652,6 +8190,23 @@ components:
       - cancelUrl
       - planName
       - successUrl
+    SwitchOrganizationRequest:
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+      required:
+      - organizationId
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        emailVerified:
+          type: boolean
     ResetPasswordRequest:
       type: object
       properties:
@@ -7692,15 +8247,6 @@ components:
       - email
       - organizationName
       - password
-    AuthResponse:
-      type: object
-      properties:
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
-        emailVerified:
-          type: boolean
     RefreshTokenRequest:
       type: object
       properties:
@@ -7744,6 +8290,14 @@ components:
           minLength: 1
       required:
       - deviceCode
+    DeviceDenyRequest:
+      type: object
+      properties:
+        userCode:
+          type: string
+          minLength: 1
+      required:
+      - userCode
     DeviceCodeResponse:
       type: object
       properties:
@@ -8371,6 +8925,10 @@ components:
         finishedAt:
           type: string
           format: date-time
+        requestHeadersJson:
+          type: string
+        requestBodySnippet:
+          type: string
         responseCode:
           type: integer
           format: int32
@@ -8418,6 +8976,86 @@ components:
           type: boolean
         empty:
           type: boolean
+    IncomingDlqItemResponse:
+      type: object
+      properties:
+        forwardAttemptId:
+          type: string
+          format: uuid
+        incomingEventId:
+          type: string
+          format: uuid
+        destinationId:
+          type: string
+          format: uuid
+        incomingSourceId:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+        destinationUrl:
+          type: string
+        attemptNumber:
+          type: integer
+          format: int32
+        maxAttempts:
+          type: integer
+          format: int32
+        responseCode:
+          type: integer
+          format: int32
+        lastError:
+          type: string
+        failedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    PageIncomingDlqItemResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncomingDlqItemResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    DlqStatsResponse:
+      type: object
+      properties:
+        totalItems:
+          type: integer
+          format: int64
+        last24Hours:
+          type: integer
+          format: int64
+        last7Days:
+          type: integer
+          format: int64
     PageIncidentResponse:
       type: object
       properties:
@@ -8617,18 +9255,6 @@ components:
           type: boolean
         empty:
           type: boolean
-    DlqStatsResponse:
-      type: object
-      properties:
-        totalItems:
-          type: integer
-          format: int64
-        last24Hours:
-          type: integer
-          format: int64
-        last7Days:
-          type: integer
-          format: int64
     PageApiKeyResponse:
       type: object
       properties:
@@ -9338,6 +9964,32 @@ components:
           format: date-time
         invoiceUrl:
           type: string
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client:
+          type: string
+          enum:
+          - WEB
+          - CLI
+        userAgent:
+          type: string
+        ipAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
     CurrentUserResponse:
       type: object
       properties:
@@ -9352,6 +10004,8 @@ components:
           - DEVELOPER
           - VIEWER
           - API_KEY
+        emailDeliveryEnabled:
+          type: boolean
     AuditLogResponse:
       type: object
       properties:

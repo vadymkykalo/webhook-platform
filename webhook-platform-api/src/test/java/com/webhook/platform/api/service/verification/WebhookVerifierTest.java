@@ -288,7 +288,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsNullForNone() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.NONE, null);
 
         assertThat(factory.getVerifier(source)).isNull();
@@ -296,7 +296,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsGenericHmac() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.HMAC_GENERIC, null);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(GenericHmacVerifier.class);
@@ -304,7 +304,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsGitHubForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GITHUB);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(GitHubVerifier.class);
@@ -312,7 +312,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsStripeForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.STRIPE);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(StripeVerifier.class);
@@ -320,7 +320,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsSlackForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.SLACK);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(SlackVerifier.class);
@@ -328,7 +328,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsShopifyForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.SHOPIFY);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(ShopifyVerifier.class);
@@ -336,12 +336,105 @@ class WebhookVerifierTest {
 
     @Test
     void factory_throwsForGenericProviderInProviderMode() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GENERIC);
 
         assertThatThrownBy(() -> factory.getVerifier(source))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No verifier available for provider type");
+    }
+
+    // ======================== TwilioVerifier ========================
+
+    private static final String TWILIO_URL = "https://hooks.example.com";
+    private static final String TWILIO_PATH = "/ingress/tok_abc";
+
+    @Test
+    void twilio_formEncoded_success() {
+        String body = "To=%2B15551234567&From=%2B15559876543&Body=hi+there";
+        // Twilio signs the URL, then every parameter sorted by name, each as the name
+        // immediately followed by its decoded value: Body, From, To.
+        String signed = TWILIO_URL + TWILIO_PATH
+                + "Bodyhi there" + "From+15559876543" + "To+15551234567";
+        String signature = hmacSha1Base64(SECRET, signed);
+
+        when(request.getHeader("X-Twilio-Signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(TWILIO_PATH);
+        when(request.getQueryString()).thenReturn(null);
+        when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
+
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body, request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(signature);
+    }
+
+    @Test
+    void twilio_formEncoded_tamperedParameterFails() {
+        String signed = TWILIO_URL + TWILIO_PATH + "Bodyhi there" + "To+15551234567";
+        String signature = hmacSha1Base64(SECRET, signed);
+
+        when(request.getHeader("X-Twilio-Signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(TWILIO_PATH);
+        when(request.getQueryString()).thenReturn(null);
+        when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
+
+        var result = new TwilioVerifier(TWILIO_URL)
+                .verify(SECRET, "To=%2B15550000000&Body=hi+there", request);
+
+        assertThat(result.verified()).isFalse();
+    }
+
+    @Test
+    void twilio_missingHeader() {
+        when(request.getHeader("X-Twilio-Signature")).thenReturn(null);
+
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "To=x", request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("X-Twilio-Signature");
+    }
+
+    @Test
+    void twilio_jsonBody_signsTheUrlAndChecksBodySha256() {
+        String body = "{\"kind\":\"event\"}";
+        String query = "bodySHA256=" + sha256Hex(body);
+        String signature = hmacSha1Base64(SECRET, TWILIO_URL + TWILIO_PATH + "?" + query);
+
+        when(request.getHeader("X-Twilio-Signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(TWILIO_PATH);
+        when(request.getQueryString()).thenReturn(query);
+        when(request.getContentType()).thenReturn("application/json");
+
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body, request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+    }
+
+    @Test
+    void twilio_jsonBody_swappedBodyFailsEvenThoughTheUrlSignatureStillMatches() {
+        String query = "bodySHA256=" + sha256Hex("{\"kind\":\"event\"}");
+        String signature = hmacSha1Base64(SECRET, TWILIO_URL + TWILIO_PATH + "?" + query);
+
+        when(request.getHeader("X-Twilio-Signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(TWILIO_PATH);
+        when(request.getQueryString()).thenReturn(query);
+        when(request.getContentType()).thenReturn("application/json");
+
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}", request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("bodySHA256");
+    }
+
+    @Test
+    void factory_returnsTwilioForProvider() {
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
+        var source = buildSource(VerificationMode.PROVIDER, ProviderType.TWILIO);
+
+        assertThat(factory.getVerifier(source)).isInstanceOf(TwilioVerifier.class);
     }
 
     // ======================== helpers ========================
@@ -354,6 +447,25 @@ class WebhookVerifierTest {
                 .hmacHeaderName("X-Signature")
                 .hmacSignaturePrefix("")
                 .build();
+    }
+
+    private static String hmacSha1Base64(String secret, String data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA1");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA1"));
+            return Base64.getEncoder().encodeToString(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static String sha256Hex(String data) {
+        try {
+            return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String hmacSha256Hex(String secret, String data) {
@@ -468,7 +580,7 @@ class WebhookVerifierTest {
                 .providerType(ProviderType.GITLAB)
                 .build();
 
-        assertThat(new WebhookVerifierFactory().getVerifier(source))
+        assertThat(new WebhookVerifierFactory(TWILIO_URL).getVerifier(source))
                 .isInstanceOf(GitLabVerifier.class);
     }
 }

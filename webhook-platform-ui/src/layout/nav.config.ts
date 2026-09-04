@@ -93,10 +93,11 @@ export const PROJECT_SECTIONS: NavSection[] = [
     nameKey: 'nav.deliveries',
     path: (projectId) => p(projectId, 'deliveries'),
     icon: Send,
-    owns: ['deliveries', 'dlq', 'replay'],
+    owns: ['deliveries', 'dlq', 'incoming-dlq', 'replay'],
     tabs: [
       tab('nav.allDeliveries', 'deliveries', Send),
       tab('nav.dlq', 'dlq', AlertTriangle),
+      tab('nav.incomingDlq', 'incoming-dlq', ArrowDownToLine),
       tab('nav.replay', 'replay', History),
     ],
   },
@@ -135,14 +136,21 @@ export const PROJECT_SECTIONS: NavSection[] = [
   },
 ];
 
-/** Org-level administration, reached from the sidebar footer rather than the rail. */
+/**
+ * Settings, reached from the sidebar footer rather than the rail.
+ *
+ * Only some of it is org-level. `/admin/settings` is the person's own profile —
+ * their display name, their timezone, the form that changes their password — and
+ * every member has to be able to open it. The three that follow act on the
+ * organization, and those stay OWNER-only.
+ */
 export const SETTINGS_SECTION: NavSection = {
   nameKey: 'nav.settings',
   path: () => '/admin/settings',
   icon: Settings,
   owns: ['settings', 'org-settings', 'members', 'audit-log', 'billing', 'api-keys'],
   tabs: [
-    orgTab('nav.profile', '/admin/settings', Settings, 'OWNER'),
+    orgTab('nav.profile', '/admin/settings', Settings),
     orgTab('nav.orgSettings', '/admin/org-settings', Building2, 'OWNER'),
     orgTab('nav.members', '/admin/members', Users, 'OWNER'),
     orgTab('nav.auditLog', '/admin/audit-log', FileText),
@@ -165,4 +173,30 @@ export function sectionFor(pathname: string): NavSection | undefined {
   const segment = segmentOf(pathname);
   if (SETTINGS_SECTION.owns.includes(segment)) return SETTINGS_SECTION;
   return PROJECT_SECTIONS.find((s) => s.owns.includes(segment));
+}
+
+/**
+ * The minimum role a destination demands — read by the navigation to decide what
+ * to offer, and by the layout to decide what to admit.
+ *
+ * One table for both, because they were two. The sidebar showed the Settings
+ * entry to every member while the router guarded `/admin/settings` at OWNER, so
+ * an invited developer or viewer clicked their own profile and got Access
+ * Denied — with no other way to change their password. Neither side declares a
+ * role of its own any more: an entry states what it needs here, and a tab that
+ * is shown is by construction a tab that opens.
+ */
+const ROLE_BY_SEGMENT: ReadonlyMap<string, Role> = new Map(
+  [
+    ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs]),
+    SETTINGS_SECTION as NavEntry,
+    ...SETTINGS_SECTION.tabs,
+    ...PROJECT_SETTINGS_TABS,
+  ]
+    .filter((entry) => entry.requiredRole)
+    .flatMap((entry) => entry.owns.map((segment) => [segment, entry.requiredRole!] as const))
+);
+
+export function requiredRoleFor(pathname: string): Role | undefined {
+  return ROLE_BY_SEGMENT.get(segmentOf(pathname));
 }

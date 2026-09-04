@@ -131,6 +131,11 @@ public class SubscriptionLifecycleService {
 
         logEvent(sub, SubscriptionEventType.GRACE_PERIOD_STARTED, prev, SubscriptionStatus.GRACE_PERIOD,
                 null, null, "Grace period started");
+        // Every other transition here syncs the organization; this one did not, so an org whose
+        // subscription entered its grace period kept reading PAST_DUE — the two rows disagreed
+        // about the same fact for the whole seven days, and BillingStatus.GRACE_PERIOD, which the
+        // dashboard and the GDPR export both already render, was never written by anything.
+        syncOrgBillingStatus(sub.getOrganizationId(), BillingStatus.GRACE_PERIOD);
         log.warn("Grace period started: sub={}", subscriptionId);
     }
 

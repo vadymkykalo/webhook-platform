@@ -89,6 +89,14 @@ spec:
             component: worker
           annotations:
             summary: "Circuit breaker rejecting >10 calls/sec"
+        - alert: CircuitBreakerDegraded
+          expr: rate(circuit_breaker_degraded_total[5m]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Circuit breaker cannot reach Redis, so it cannot trip"
 
     - name: hookflow.retry_governor
       rules:

@@ -127,8 +127,19 @@ public final class JsonSchemaUtils {
 
     /**
      * Computes the diff between two JSON Schemas.
-     * Returns a JSON object with "added", "removed", "changed" arrays,
-     * and a "breaking" boolean flag.
+     *
+     * <p>Five buckets, because a compatibility rule has to tell them apart: properties the new
+     * schema added, properties it dropped, properties whose type it changed, properties it made
+     * required that were optional before ({@code tightened}), and properties it made optional
+     * that were required before ({@code relaxed}). Whether a property is required is read from
+     * the {@code required} array of the object that owns it, not the root's — a nested object
+     * has its own, and reading the root's marked every nested field optional.
+     *
+     * <p>{@code breaking} is the union of the four that cost somebody something: it answers
+     * "would any consumer of either schema notice?", which is what the schema-changes board
+     * shows. The narrower question — "is this allowed under the compatibility mode this version
+     * declares?" — is answered by {@code CompatibilityMode}, which reads the buckets separately,
+     * because the two directions disagree about which of them matter.
      */
     public static SchemaDiff diff(String oldSchemaJson, String newSchemaJson) throws JsonProcessingException {
         JsonNode oldSchema = MAPPER.readTree(oldSchemaJson);
@@ -137,65 +148,43 @@ public final class JsonSchemaUtils {
         List<FieldChange> added = new ArrayList<>();
         List<FieldChange> removed = new ArrayList<>();
         List<FieldChange> changed = new ArrayList<>();
+        List<FieldChange> tightened = new ArrayList<>();
+        List<FieldChange> relaxed = new ArrayList<>();
 
-        Set<String> oldRequired = extractRequired(oldSchema);
-        Set<String> newRequired = extractRequired(newSchema);
+        Map<String, Property> oldProps = flattenProperties(oldSchema, "$");
+        Map<String, Property> newProps = flattenProperties(newSchema, "$");
 
-        Map<String, JsonNode> oldProps = flattenProperties(oldSchema, "$");
-        Map<String, JsonNode> newProps = flattenProperties(newSchema, "$");
+        for (Map.Entry<String, Property> entry : newProps.entrySet()) {
+            Property newProp = entry.getValue();
+            Property oldProp = oldProps.get(entry.getKey());
 
-        // Added fields
-        for (Map.Entry<String, JsonNode> entry : newProps.entrySet()) {
-            if (!oldProps.containsKey(entry.getKey())) {
-                String fieldName = lastSegment(entry.getKey());
-                boolean isRequired = isFieldRequired(newSchema, entry.getKey(), newRequired);
-                added.add(new FieldChange(entry.getKey(), getType(entry.getValue()), null, isRequired));
+            if (oldProp == null) {
+                added.add(new FieldChange(entry.getKey(), newProp.type(), null, newProp.required()));
+                continue;
+            }
+            if (!oldProp.type().equals(newProp.type())) {
+                changed.add(new FieldChange(entry.getKey(), newProp.type(), oldProp.type(), newProp.required()));
+            }
+            if (!oldProp.required() && newProp.required()) {
+                tightened.add(new FieldChange(entry.getKey(), newProp.type(), oldProp.type(), true));
+            } else if (oldProp.required() && !newProp.required()) {
+                relaxed.add(new FieldChange(entry.getKey(), newProp.type(), oldProp.type(), false));
             }
         }
 
-        // Removed fields
-        for (Map.Entry<String, JsonNode> entry : oldProps.entrySet()) {
+        for (Map.Entry<String, Property> entry : oldProps.entrySet()) {
             if (!newProps.containsKey(entry.getKey())) {
-                removed.add(new FieldChange(entry.getKey(), null, getType(entry.getValue()), false));
+                Property oldProp = entry.getValue();
+                removed.add(new FieldChange(entry.getKey(), null, oldProp.type(), oldProp.required()));
             }
         }
 
-        // Changed fields
-        for (Map.Entry<String, JsonNode> entry : newProps.entrySet()) {
-            if (oldProps.containsKey(entry.getKey())) {
-                JsonNode oldProp = oldProps.get(entry.getKey());
-                JsonNode newProp = entry.getValue();
-                String oldType = getType(oldProp);
-                String newType = getType(newProp);
+        boolean breaking = !removed.isEmpty()
+                || !changed.isEmpty()
+                || !tightened.isEmpty()
+                || added.stream().anyMatch(FieldChange::required);
 
-                if (!oldType.equals(newType)) {
-                    changed.add(new FieldChange(entry.getKey(), newType, oldType, false));
-                }
-            }
-        }
-
-        // Determine breaking changes
-        boolean breaking = false;
-
-        // Removed field = breaking
-        if (!removed.isEmpty()) {
-            breaking = true;
-        }
-
-        // Type changed = breaking
-        if (!changed.isEmpty()) {
-            breaking = true;
-        }
-
-        // Field became required (was optional or new + required) = breaking
-        for (FieldChange add : added) {
-            if (add.required) {
-                breaking = true;
-                break;
-            }
-        }
-
-        return new SchemaDiff(added, removed, changed, breaking);
+        return new SchemaDiff(added, removed, changed, tightened, relaxed, breaking);
     }
 
     /**
@@ -207,6 +196,8 @@ public final class JsonSchemaUtils {
             json.set("added", MAPPER.valueToTree(diff.added));
             json.set("removed", MAPPER.valueToTree(diff.removed));
             json.set("changed", MAPPER.valueToTree(diff.changed));
+            json.set("tightened", MAPPER.valueToTree(diff.tightened));
+            json.set("relaxed", MAPPER.valueToTree(diff.relaxed));
             json.put("breaking", diff.breaking);
             return MAPPER.writeValueAsString(json);
         } catch (JsonProcessingException e) {
@@ -303,14 +294,19 @@ public final class JsonSchemaUtils {
 
     // ── Helpers ──
 
-    private static Map<String, JsonNode> flattenProperties(JsonNode schema, String prefix) {
-        Map<String, JsonNode> result = new LinkedHashMap<>();
+    /**
+     * Every property in the schema, keyed by JSONPath, each carrying its declared type and
+     * whether the object that owns it lists it as required.
+     */
+    private static Map<String, Property> flattenProperties(JsonNode schema, String prefix) {
+        Map<String, Property> result = new LinkedHashMap<>();
         if (schema.has("properties") && schema.get("properties").isObject()) {
+            Set<String> required = extractRequired(schema);
             Iterator<Map.Entry<String, JsonNode>> fields = schema.get("properties").fields();
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> field = fields.next();
                 String path = prefix + "." + field.getKey();
-                result.put(path, field.getValue());
+                result.put(path, new Property(getType(field.getValue()), required.contains(field.getKey())));
                 // Recurse into nested objects
                 if (field.getValue().has("type") && "object".equals(field.getValue().get("type").asText())) {
                     result.putAll(flattenProperties(field.getValue(), path));
@@ -330,11 +326,6 @@ public final class JsonSchemaUtils {
         return required;
     }
 
-    private static boolean isFieldRequired(JsonNode rootSchema, String path, Set<String> rootRequired) {
-        String fieldName = lastSegment(path);
-        return rootRequired.contains(fieldName);
-    }
-
     private static String getType(JsonNode propSchema) {
         if (propSchema.has("type")) {
             return propSchema.get("type").asText();
@@ -342,19 +333,26 @@ public final class JsonSchemaUtils {
         return "unknown";
     }
 
-    private static String lastSegment(String path) {
-        int idx = path.lastIndexOf('.');
-        return idx >= 0 ? path.substring(idx + 1) : path;
-    }
+    private record Property(String type, boolean required) {}
 
     // ── Data classes ──
 
     public record FieldChange(String path, String type, String oldType, boolean required) {}
 
+    /**
+     * @param added     properties the new schema has and the old one did not
+     * @param removed   properties the old schema had and the new one does not
+     * @param changed   properties whose declared type differs between the two
+     * @param tightened properties the new schema requires that the old one left optional
+     * @param relaxed   properties the new schema leaves optional that the old one required
+     * @param breaking  true when a consumer of either schema could notice the difference
+     */
     public record SchemaDiff(
             List<FieldChange> added,
             List<FieldChange> removed,
             List<FieldChange> changed,
+            List<FieldChange> tightened,
+            List<FieldChange> relaxed,
             boolean breaking
     ) {}
 }

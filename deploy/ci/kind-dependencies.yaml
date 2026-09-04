@@ -1,0 +1,218 @@
+# PostgreSQL, Kafka and Redis for the kind smoke test in .github/workflows/ci.yml.
+#
+# The chart requires all three and ships none of them (see the Helm README's
+# Prerequisites), so anything that actually installs the chart has to stand them
+# up first. These are the exact images docker-compose.yml runs, configured the
+# way it configures them, because the point of the smoke test is to install the
+# chart against a database and a broker that behave like the real ones.
+#
+# Single replica, emptyDir storage, no resource requests: this exists for the
+# lifetime of one CI job on one kind node. It is not a template for running
+# Hookflow's dependencies in production — a managed service or a StatefulSet is,
+# and the README says so.
+#
+# Passwords come from the same Secrets the chart reads, created by the workflow
+# before this is applied. Postgres's bootstrap password and the API's
+# DB_PASSWORD are therefore literally the same value, which is the pairing
+# install.sh spells out for POSTGRES_PASSWORD / DB_PASSWORD.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              value: hookflow
+            - name: POSTGRES_USER
+              value: webhook_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hookflow-postgresql-secret
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          # Over TCP, not the unix socket, and with a real query: the image's
+          # entrypoint runs a temporary server with listen_addresses='' while it
+          # applies the initdb scripts, and a socket probe reports that one as
+          # ready — so a dependant starts and the temporary server is then
+          # stopped out from under it. Same reasoning as docker-compose.yml's
+          # healthcheck and the restore-drill job's wait loop.
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -h 127.0.0.1 -U webhook_user -d hookflow && psql -U webhook_user -d hookflow -c 'SELECT 1'
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:3.7.0
+          # KRaft, single combined broker/controller node — the same shape
+          # docker-compose.yml uses. The advertised listener has to be the
+          # Service name, since that is how the api and worker reach it.
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: broker,controller
+            - name: KAFKA_LISTENERS
+              value: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+            - name: KAFKA_ADVERTISED_LISTENERS
+              # Clients do go through the Service, and by the time any connect it has
+              # endpoints — so this one is correct as the Service name.
+              value: PLAINTEXT://kafka:9092
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              # localhost, not the Service name. This is the one line that does not
+              # transfer from docker-compose.yml: there `kafka` is the container's own
+              # hostname, so :9093 lands on the container itself. Here `kafka` is a
+              # Service that publishes 9092 and nothing else, so the controller looked
+              # for its own quorum on a port the Service does not define, never formed
+              # it, and never opened 9092 — the broker crash-looped and the readiness
+              # probe reported "connection refused" on a port that was never going to
+              # be listening. A single combined broker/controller node reaches its own
+              # controller over loopback and needs no Service to do it.
+              value: 1@localhost:9093
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "1"
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "1"
+            - name: CLUSTER_ID
+              value: webhook-kafka-cluster
+          ports:
+            - containerPort: 9092
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+    - port: 9092
+      targetPort: 9092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - sh
+            - -c
+            - exec redis-server --requirepass "$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hookflow-redis-secret
+                  key: password
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli -a \"$REDIS_PASSWORD\" ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

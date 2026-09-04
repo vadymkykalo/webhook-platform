@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.ChangeMemberRoleRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireOrgAccess;
 import com.webhook.platform.api.service.MembershipService;
 import com.webhook.platform.api.service.billing.QuotaType;
@@ -75,6 +77,58 @@ public class MemberController {
                 userId,
                 request.getRole(),
                 auth.role());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Re-issue invite",
+            description = "Issues a fresh invite token for a member whose invite is still pending, "
+                    + "replacing the previous one and restarting its 48-hour expiry. The accept-invite "
+                    + "link is returned so an owner can pass it on when email delivery is not configured.")
+    @ApiResponse(responseCode = "200", description = "Invite re-issued")
+    @RequireOrgAccess
+    @PostMapping("/{userId}/invite")
+    public ResponseEntity<MemberResponse> reissueInvite(
+            @PathVariable("orgId") UUID orgId,
+            @PathVariable("userId") UUID userId,
+            AuthContext auth) {
+        auth.requireJwt();
+        MemberResponse response = membershipService.reissueInvite(userId, auth.role());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Suspend member",
+            description = "Suspends a member: the membership and its role are kept, the member is "
+                    + "refused access, and their current sessions end immediately")
+    @ApiResponse(responseCode = "200", description = "Member suspended")
+    @RequireOrgAccess
+    @RequireAccess(AccessLevel.OWNER)
+    @PostMapping("/{userId}/suspend")
+    public ResponseEntity<MemberResponse> suspendMember(
+            @PathVariable("orgId") UUID orgId,
+            @PathVariable("userId") UUID userId,
+            AuthContext auth) {
+        auth.requireJwt();
+        auth.requireOwnerAccess();
+        MemberResponse response = membershipService.suspendMember(
+                userId,
+                auth.requireUserId(),
+                auth.role());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Reinstate member",
+            description = "Lifts a suspension, restoring the member's access in the role they kept")
+    @ApiResponse(responseCode = "200", description = "Member reinstated")
+    @RequireOrgAccess
+    @RequireAccess(AccessLevel.OWNER)
+    @PostMapping("/{userId}/reinstate")
+    public ResponseEntity<MemberResponse> reinstateMember(
+            @PathVariable("orgId") UUID orgId,
+            @PathVariable("userId") UUID userId,
+            AuthContext auth) {
+        auth.requireJwt();
+        auth.requireOwnerAccess();
+        MemberResponse response = membershipService.reinstateMember(userId, auth.role());
         return ResponseEntity.ok(response);
     }
 

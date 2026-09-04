@@ -72,6 +72,7 @@ class NativeQueryTenantPredicateTest {
             "DeliveryAttemptRepository.deleteOldSuccessfulAttempts",
             "DeliveryAttemptRepository.deleteExcessAttemptsPerDelivery",
             "IncomingEventRepository.deleteOldIncomingEvents",
+            "EventRepository.deleteOldEvents",
             "OutboxMessageRepository.deleteOldPublishedMessages",
 
             // Table-size estimates driving the retention thresholds: pg_stat_user_tables and
@@ -79,6 +80,8 @@ class NativeQueryTenantPredicateTest {
             "DeliveryAttemptRepository.countAllAttempts",
             "DeliveryAttemptRepository.estimatedRowCount",
             "IncomingEventRepository.estimatedRowCount",
+            "EventRepository.estimatedRowCount",
+            "EventRepository.estimatedDeliveryRowCount",
 
             // The outbox is the one place that is deliberately cross-tenant by design:
             // OutboxPublisherService polls, claims and settles every organization's messages in

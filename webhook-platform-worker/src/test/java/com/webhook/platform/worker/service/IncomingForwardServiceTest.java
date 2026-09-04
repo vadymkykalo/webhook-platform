@@ -139,7 +139,8 @@ class IncomingForwardServiceTest {
         // Tenant isolation guards — permissive by default
         when(projectRateLimiterService.tryAcquire(any(UUID.class))).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
-        when(concurrencyControlService.tryAcquire(any(UUID.class))).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(any(UUID.class))).thenReturn(true);
 
         service = newService(WebClient.builder().build(), new SimpleMeterRegistry(), newAttemptRunner(true));
     }
@@ -190,8 +191,8 @@ class IncomingForwardServiceTest {
     void firstDispatch_claimsExistingPendingRow_notInsert() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -201,7 +202,7 @@ class IncomingForwardServiceTest {
         service.processForward(message);
 
         // Must claim via UPDATE, never INSERT
-        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class));
+        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class));
         verify(attemptRepository, never()).saveAndFlush(any(IncomingForwardAttempt.class));
     }
 
@@ -209,7 +210,7 @@ class IncomingForwardServiceTest {
     void firstDispatch_alreadyClaimed_skipsIdempotently() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class))).thenReturn(0);
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class))).thenReturn(0);
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -218,9 +219,9 @@ class IncomingForwardServiceTest {
 
         service.processForward(message);
 
-        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class));
+        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class));
         // Should not proceed to HTTP call
-        verify(attemptRepository, never()).findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(any(), any());
+        verify(attemptRepository, never()).findForwardAttempts(any(), any(), any());
     }
 
     // -- Retry dispatch: scheduler already claimed, no re-claim --
@@ -238,7 +239,7 @@ class IncomingForwardServiceTest {
         service.processForward(message);
 
         // Must NOT call claimForProcessing -- scheduler already did it
-        verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any());
+        verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any(), any());
     }
 
     // -- duplicate Kafka delivery of a retry message must not double-POST --
@@ -258,9 +259,9 @@ class IncomingForwardServiceTest {
 
         service.processForward(message);
 
-        verify(attemptRepository, never()).claimRetryForProcessing(any(), any(), anyInt(), any(), any());
+        verify(attemptRepository, never()).claimRetryForProcessing(any(), any(), anyInt(), any(), any(), any());
         // Guard chain must have been entered -- proves attemptForward ran.
-        verify(concurrencyControlService).tryAcquire(destinationId);
+        verify(concurrencyControlService).tryAcquireForTarget(destinationId);
     }
 
     @Test
@@ -280,7 +281,7 @@ class IncomingForwardServiceTest {
 
         // First delivery wins the CAS; the redelivered duplicate finds the token already
         // consumed (started_at moved on) and updates 0 rows.
-        when(attemptRepository.claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), eq(fencingToken), any(UUID.class)))
+        when(attemptRepository.claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), isNull(), eq(fencingToken), any(UUID.class)))
                 .thenReturn(1)
                 .thenReturn(0);
 
@@ -295,10 +296,10 @@ class IncomingForwardServiceTest {
         service.processForward(message);
 
         verify(attemptRepository, times(2))
-                .claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), eq(fencingToken), any(UUID.class));
+                .claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), isNull(), eq(fencingToken), any(UUID.class));
         // Only the winning delivery must reach the dispatch guard chain -- i.e. exactly
         // one attempt to acquire a concurrency permit, which is what gates the HTTP POST.
-        verify(concurrencyControlService, times(1)).tryAcquire(destinationId);
+        verify(concurrencyControlService, times(1)).tryAcquireForTarget(destinationId);
     }
 
     // -- SSRF failure: claim + update, not INSERT --
@@ -310,14 +311,14 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
 
         IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         // Re-create service with allowPrivateIps=false for SSRF to trigger
@@ -332,7 +333,7 @@ class IncomingForwardServiceTest {
         ssrfService.processForward(message);
 
         // Must claim via UPDATE then update to FAILED, never INSERT
-        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class));
+        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class));
         verify(attemptRepository, never()).saveAndFlush(any(IncomingForwardAttempt.class));
 
         ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
@@ -355,16 +356,30 @@ class IncomingForwardServiceTest {
 
         service.processForward(message);
 
-        verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any());
+        verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any(), any());
     }
 
+    /**
+     * A disabled Destination is decided under the Claim, like every other terminal outcome.
+     * This used to be checked here, before anything was claimed, so it wrote FAILED over
+     * whatever else owned the row.
+     */
     @Test
-    void destinationDisabled_skips() {
+    void destinationDisabled_failsTheAttemptUnderItsClaim() {
         IncomingDestination dest = buildDestination();
         dest.setEnabled(false);
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
+
+        IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
+                .thenAnswer(inv -> asClaimed(existingAttempt));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -373,7 +388,11 @@ class IncomingForwardServiceTest {
 
         service.processForward(message);
 
-        verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any());
+        verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class));
+        ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ForwardAttemptStatus.FAILED);
+        assertThat(captor.getValue().getErrorMessage()).isEqualTo("Destination is disabled");
     }
 
     // -- a configured transformation that fails must fail the attempt, never forward
@@ -394,7 +413,7 @@ class IncomingForwardServiceTest {
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(2).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         WebClient mockWebClient = mock(WebClient.class);
@@ -448,7 +467,7 @@ class IncomingForwardServiceTest {
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(2).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         WebClient mockWebClient = mock(WebClient.class);
@@ -485,12 +504,12 @@ class IncomingForwardServiceTest {
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         WebClient mockWebClient = mock(WebClient.class);
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
         IncomingForwardService localService = newService(
                 mockWebClient, new SimpleMeterRegistry(), newAttemptRunner(true));
 
@@ -529,9 +548,9 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(alreadySucceeded));
         when(transformationCacheService.findById(any())).thenReturn(Optional.empty());
         when(payloadTransformService.transform(anyString(), any()))
@@ -564,7 +583,7 @@ class IncomingForwardServiceTest {
                 .startedAt(Instant.now())
                 .build();
 
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(inFlight));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -591,7 +610,7 @@ class IncomingForwardServiceTest {
                 .status(ForwardAttemptStatus.SUCCESS)
                 .build();
 
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(done));
 
         service.rescheduleForBackpressure(IncomingForwardMessage.builder()
@@ -614,15 +633,14 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
 
         IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
-                eventId, destinationId)).thenAnswer(inv -> asClaimed(claimed));
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null)).thenAnswer(inv -> asClaimed(claimed));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -641,7 +659,7 @@ class IncomingForwardServiceTest {
                 .contains("INVALID_RETRY_LADDER");
 
         // Checked after the claim but before admission: no permit taken, nothing sent.
-        verify(concurrencyControlService, never()).tryAcquire(destinationId);
+        verify(concurrencyControlService, never()).tryAcquireForTarget(destinationId);
     }
 
     // -- a Forward whose ladder is exhausted announces itself --
@@ -656,15 +674,14 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
 
         IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
-                eventId, destinationId)).thenAnswer(inv -> asClaimed(claimed));
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null)).thenAnswer(inv -> asClaimed(claimed));
         // Nothing is listening on the destination URL, so the attempt errors and, with
         // maxAttempts=1, is abandoned rather than retried.
         destination.setUrl("http://127.0.0.1:1/hook");
@@ -692,16 +709,15 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
         destination.setUrl("http://127.0.0.1:1/hook");
 
         IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
-                eventId, destinationId)).thenAnswer(inv -> asClaimed(claimed));
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null)).thenAnswer(inv -> asClaimed(claimed));
 
         service.processForward(IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -717,8 +733,8 @@ class IncomingForwardServiceTest {
     void attemptReclaimedMidFlight_doesNotFinaliseOrQueueASuccessor() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
-        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
-                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
+        when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
+                .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
 
         // The row as it looks by the time this attempt finishes: PROCESSING again, but under
         // a *different* token — StuckForwardRecoveryService handed it back and the scheduler
@@ -728,7 +744,7 @@ class IncomingForwardServiceTest {
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .claimToken(UUID.randomUUID())
                 .build();
-        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+        when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenReturn(List.of(reclaimed));
 
         service.processForward(IncomingForwardMessage.builder()

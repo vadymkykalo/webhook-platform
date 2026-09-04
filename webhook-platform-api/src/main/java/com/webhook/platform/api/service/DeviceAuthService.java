@@ -3,8 +3,11 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
+import com.webhook.platform.api.domain.entity.UserSession;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
+import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
@@ -33,6 +36,7 @@ public class DeviceAuthService {
 
     private final DeviceAuthCodeRepository deviceAuthCodeRepository;
     private final MembershipRepository membershipRepository;
+    private final UserSessionService userSessionService;
     private final JwtUtil jwtUtil;
 
     @Value("${app.base-url:http://localhost:5173}")
@@ -91,9 +95,34 @@ public class DeviceAuthService {
         log.info("Device auth approved: userCode={}, userId={}", userCode, userId);
     }
 
+    /**
+     * The other answer to "a terminal somewhere is asking to log in as you".
+     *
+     * <p>{@code DENIED} was a status the poll path already refused a token for, with a 403 the CLI
+     * already prints as "Authorization denied" — and nothing could ever set it. The verification
+     * screen offered Approve and a Cancel that only reset the form, so a person who did not
+     * recognise the code had no way to say so: the code stayed PENDING and whoever had asked for it
+     * kept polling for the rest of its ten minutes. Denying ends that immediately.
+     *
+     * <p>Only the status is written. The code carries no user and no organization afterwards, so
+     * there is nothing for a later poll to mint a token from even if one reached the APPROVED
+     * branch, and the row does not read as an approval by the person who refused it.
+     */
+    @Transactional
+    public void denyDeviceCode(String userCode, UUID userId) {
+        DeviceAuthCode code = deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Device code not found or already used"));
+
+        code.setStatus(DeviceAuthStatus.DENIED);
+        deviceAuthCodeRepository.save(code);
+
+        log.warn("Device auth denied: userCode={}, deniedBy={}", userCode, userId);
+    }
+
     @SystemTenant("polled by an unauthenticated CLI; the membership read is what decides which organization the issued token names")
     @Transactional
-    public AuthResponse pollDeviceToken(String deviceCode) {
+    public AuthResponse pollDeviceToken(String deviceCode, SessionOrigin origin) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByDeviceCode(deviceCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device code not found"));
 
@@ -127,6 +156,16 @@ public class DeviceAuthService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
                         "User is not a member of the approved organization"));
 
+        // The other place a Membership becomes an authenticated context, and so the other place
+        // a suspension has to be refused (AuthService.membershipToIssueTokenFor is the first).
+        // The approval itself needs a live session, which suspending revokes — but a code
+        // approved just before the suspension is still sitting there waiting to be polled, and
+        // exchanging it would hand out a fresh fifteen minutes of access.
+        if (membership.getStatus() == MembershipStatus.DISABLED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Your membership in this organization has been suspended");
+        }
+
         // Single-use, compare-and-set: only the caller that actually flips APPROVED ->
         // CONSUMED gets to mint tokens. A second concurrent poll (or a replay after the
         // first succeeded) loses the race and is refused rather than minting another
@@ -136,9 +175,26 @@ public class DeviceAuthService {
             throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
         }
 
+        // A CLI grant is recorded as a session like any browser sign-in, and named CLI so the
+        // dashboard can say what it is. It is the credential most likely to outlive the machine
+        // it was issued to, and before this it was the one a user could neither see nor end.
+        UUID sessionId = UUID.randomUUID();
+        String refreshToken = jwtUtil.generateRefreshToken(code.getUserId(), sessionId);
+
+        userSessionService.open(UserSession.builder()
+                .id(sessionId)
+                .userId(code.getUserId())
+                .organizationId(code.getOrganizationId())
+                .refreshTokenJti(jwtUtil.getJtiFromToken(refreshToken))
+                .client(SessionClient.CLI)
+                .userAgent(origin.userAgent())
+                .ipAddress(origin.ipAddress())
+                .lastSeenAt(Instant.now())
+                .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
+                .build());
+
         String accessToken = jwtUtil.generateAccessToken(
-                code.getUserId(), code.getOrganizationId(), membership.getRole());
-        String refreshToken = jwtUtil.generateRefreshToken(code.getUserId());
+                code.getUserId(), code.getOrganizationId(), membership.getRole(), sessionId);
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

@@ -16,12 +16,6 @@ Notable licenses among bundled/runtime components, called out here because
 they are not MIT/Apache-2.0/BSD/ISC (the common case for the rest of the
 stack — see the full report for the complete list):
 
-  - MinIO (docker-compose.yml's optional `minio` service, used only for local
-    object storage in the embedded-DB Compose profile) is licensed under the
-    GNU AGPLv3, not MIT/Apache-2.0. See docs/licenses/DECISIONS.md for the
-    project's position on why this does not affect Hookflow's own MIT license
-    and what operators should know before relying on it in production.
-
   - The Bitnami subcharts referenced as optional dependencies of the Helm
     chart (deploy/helm/hookflow/Chart.yaml) carry their own upstream licenses
     (predominantly Apache-2.0); see docs/licenses/DECISIONS.md for the pinned

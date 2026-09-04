@@ -70,7 +70,7 @@ class BillingSchedulerServiceTest {
             @Override public String getProviderCode() { return "wayforpay"; }
             @Override public String getDisplayName() { return "WayForPay"; }
             @Override public Set<BillingCapability> capabilities() {
-                return EnumSet.of(BillingCapability.MERCHANT_RECURRING, BillingCapability.REFUNDS);
+                return EnumSet.of(BillingCapability.MERCHANT_RECURRING);
             }
             @Override public BillingWebhookEvent parseWebhook(String raw, Map<String, String> h) { return null; }
             @Override public ChargeResult chargeRecurring(RecurringChargeRequest req) {

@@ -59,6 +59,17 @@ public class IncomingForwardAttempt {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    /**
+     * Headers as they went to the Destination, already sanitised: this is shown in the
+     * dashboard, so the Destination's own credentials must be masked before they land here.
+     */
+    @Column(name = "request_headers_json", columnDefinition = "TEXT")
+    private String requestHeadersJson;
+
+    /** The transformed body actually sent, capped the way {@code delivery_attempts} caps its own. */
+    @Column(name = "request_body_snippet", columnDefinition = "TEXT")
+    private String requestBodySnippet;
+
     @Column(name = "response_code")
     private Integer responseCode;
 
@@ -73,6 +84,17 @@ public class IncomingForwardAttempt {
 
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
+
+    /**
+     * The Replay this Forward belongs to, null for one created by ingress (V064).
+     *
+     * <p>A Replay builds a fresh Forward with its own ladder starting at attempt 1, so its rows
+     * would otherwise collide by attempt number with the live ladder's. Every claim is scoped to
+     * this value, which is what stops two Replays of the same Incoming Event to the same
+     * Destination claiming each other's rows.</p>
+     */
+    @Column(name = "replay_session_id")
+    private UUID replaySessionId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

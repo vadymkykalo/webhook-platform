@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, ChevronsLeft, LogOut, Search, Settings, X } from 'lucide-react';
+import { BookOpen, ChevronsLeft, LogOut, Settings, X } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import ProjectSwitcher from '../components/ProjectSwitcher';
+import OrganizationSwitcher from '../components/OrganizationSwitcher';
 import { PROJECT_SECTIONS, SETTINGS_SECTION, segmentOf, type NavSection } from './nav.config';
 import type { CurrentUserResponse } from '../types/api.types';
 
@@ -65,9 +66,6 @@ export default function Sidebar({
   const segment = segmentOf(location.pathname);
   const narrow = collapsed && !isMobile;
 
-  const openPalette = () =>
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-
   return (
     <div className="flex h-full flex-col bg-background">
       <div className={cn('flex h-14 items-center border-b border-rail px-3', narrow && 'justify-center px-2')}>
@@ -99,7 +97,7 @@ export default function Sidebar({
       )}
 
       <nav aria-label={t('nav.navigation')} className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {PROJECT_SECTIONS.map((section) => (
+        {PROJECT_SECTIONS.filter((section) => !section.requiredRole || hasMinRole(role, section.requiredRole)).map((section) => (
           <RailLink
             key={section.nameKey}
             section={section}
@@ -111,17 +109,11 @@ export default function Sidebar({
         ))}
       </nav>
 
+      {/* Documentation and settings. Search is not here: the header bar carries
+          it, and it carries it at every width — this copy only rendered on an
+          expanded sidebar, so a wide screen showed two identical "Search ⌘K"
+          controls at once and a collapsed one showed none. */}
       <div className="space-y-0.5 border-t border-rail p-2">
-        {!narrow && (
-          <button
-            onClick={openPalette}
-            className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
-          >
-            <Search className="h-4 w-4 flex-shrink-0" />
-            <span className="flex-1 text-left">{t('nav.search')}</span>
-            <kbd className="rounded border border-rail bg-secondary px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
-          </button>
-        )}
         <Link
           to="/docs"
           onClick={isMobile ? onNavigate : undefined}
@@ -134,24 +126,25 @@ export default function Sidebar({
           <BookOpen className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.documentation')}</span>}
         </Link>
-        {hasMinRole(role, 'VIEWER') && (
-          <Link
-            to={SETTINGS_SECTION.path()}
-            onClick={isMobile ? onNavigate : undefined}
-            aria-current={SETTINGS_SECTION.owns.includes(segment) ? 'page' : undefined}
-            title={narrow ? t('nav.settings') : undefined}
-            className={cn(
-              'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
-              narrow && 'justify-center px-2',
-              SETTINGS_SECTION.owns.includes(segment)
-                ? 'bg-secondary font-medium text-foreground'
-                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-            )}
-          >
-            <Settings className="h-4 w-4 flex-shrink-0" />
-            {!narrow && <span>{t('nav.settings')}</span>}
-          </Link>
-        )}
+        {/* Shown to everyone, and it lands on the personal profile — the page
+            where a member changes their own password. What the section's
+            org-level tabs need is stated in nav.config and filtered there. */}
+        <Link
+          to={SETTINGS_SECTION.path()}
+          onClick={isMobile ? onNavigate : undefined}
+          aria-current={SETTINGS_SECTION.owns.includes(segment) ? 'page' : undefined}
+          title={narrow ? t('nav.settings') : undefined}
+          className={cn(
+            'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
+            narrow && 'justify-center px-2',
+            SETTINGS_SECTION.owns.includes(segment)
+              ? 'bg-secondary font-medium text-foreground'
+              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+          )}
+        >
+          <Settings className="h-4 w-4 flex-shrink-0" />
+          {!narrow && <span>{t('nav.settings')}</span>}
+        </Link>
       </div>
 
       <div className="border-t border-rail p-2">
@@ -165,11 +158,9 @@ export default function Sidebar({
             <>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] leading-tight">{user.user?.email}</p>
-                {user.organization && (
-                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                    {user.organization.name}
-                  </p>
-                )}
+                {/* Renders as the plain name it always was until there is a second organization
+                    to switch to, so nobody gets a control over a list of one. */}
+                <OrganizationSwitcher />
               </div>
               <Button variant="ghost" size="icon-sm" onClick={onLogout}
                 className="flex-shrink-0 text-muted-foreground hover:text-halt"

@@ -31,8 +31,11 @@ spec:
           image: "{{ .Values.global.imageRegistry }}{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           ports:
-            - name: http
-              containerPort: 8081
+            # The worker serves no traffic of its own: this is actuator, and
+            # nothing else. Named for what it is, so the ServiceMonitor and the
+            # api's port of the same name mean the same thing.
+            - name: management
+              containerPort: {{ include "hookflow.worker.managementPort" . }}
               protocol: TCP
           envFrom:
             - configMapRef:
@@ -57,6 +60,24 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.encryptionKey.existingSecret }}
                   key: {{ .Values.secrets.encryptionKey.key }}
+            # Required, no default (application.yml: `encryption-salt:
+            # ${WEBHOOK_ENCRYPTION_SALT}`), and it must be the same value the
+            # api gets or the two disagree about how to decrypt every stored
+            # secret.
+            - name: WEBHOOK_ENCRYPTION_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.encryptionSalt.existingSecret }}
+                  key: {{ .Values.secrets.encryptionSalt.key }}
+            # After the worker.env range, deliberately — see the api
+            # Deployment for why neither of these is a knob. The worker's
+            # MANAGEMENT_ADDRESS default is 127.0.0.1 (unlike the api's), so
+            # without this its actuator answered nothing outside the pod: the
+            # kubelet's probes and every scrape failed alike.
+            - name: MANAGEMENT_PORT
+              value: {{ include "hookflow.worker.managementPort" . | quote }}
+            - name: MANAGEMENT_ADDRESS
+              value: "0.0.0.0"
           livenessProbe:
             {{- toYaml .Values.worker.livenessProbe | nindent 12 }}
           readinessProbe:

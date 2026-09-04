@@ -51,9 +51,9 @@ class RedisConcurrencyControlServiceTest {
                 .thenReturn(UUID.randomUUID().toString());
 
         RedisConcurrencyControlService service = new RedisConcurrencyControlService(
-                redissonClient, new SimpleMeterRegistry(), 5, leaseSeconds);
+                redissonClient, new SimpleMeterRegistry(), 5, 20, leaseSeconds);
 
-        assertTrue(service.tryAcquire(UUID.randomUUID()));
+        assertTrue(service.tryAcquireForTarget(UUID.randomUUID()));
 
         // The old code called the 2-arg tryAcquire(waitTime, unit) overload, which never
         // expires a permit. Verifying the 3-arg overload was invoked with the configured
@@ -69,9 +69,9 @@ class RedisConcurrencyControlServiceTest {
         when(semaphore.tryAcquire(anyLong(), anyLong(), eq(TimeUnit.SECONDS))).thenReturn(null);
 
         RedisConcurrencyControlService service = new RedisConcurrencyControlService(
-                redissonClient, new SimpleMeterRegistry(), 5, leaseSeconds);
+                redissonClient, new SimpleMeterRegistry(), 5, 20, leaseSeconds);
 
-        assertFalse(service.tryAcquire(UUID.randomUUID()));
+        assertFalse(service.tryAcquireForTarget(UUID.randomUUID()));
 
         ArgumentCaptor<Long> waitTime = ArgumentCaptor.forClass(Long.class);
         verify(semaphore).tryAcquire(waitTime.capture(), eq((long) leaseSeconds), eq(TimeUnit.SECONDS));
@@ -93,12 +93,12 @@ class RedisConcurrencyControlServiceTest {
     void release_withoutAnyAcquire_doesNotDriveTheGaugeNegative() {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         RedisConcurrencyControlService service = new RedisConcurrencyControlService(
-                redissonClient, meterRegistry, 5, 90);
+                redissonClient, meterRegistry, 5, 20, 90);
 
         // Nothing was ever acquired for this endpoint (e.g. a duplicate/defensive release()
         // call). RedisConcurrencyControlService.java:144-146 used to decrement the gauge here
         // unconditionally.
-        service.release(UUID.randomUUID());
+        service.releaseForTarget(UUID.randomUUID());
 
         assertEquals(0.0, meterRegistry.get("webhook_concurrency_active_permits").gauge().value());
     }
@@ -111,13 +111,13 @@ class RedisConcurrencyControlServiceTest {
 
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         RedisConcurrencyControlService service = new RedisConcurrencyControlService(
-                redissonClient, meterRegistry, 5, 90);
+                redissonClient, meterRegistry, 5, 20, 90);
 
         UUID endpointId = UUID.randomUUID();
-        assertTrue(service.tryAcquire(endpointId));
+        assertTrue(service.tryAcquireForTarget(endpointId));
         assertEquals(1.0, meterRegistry.get("webhook_concurrency_active_permits").gauge().value());
 
-        service.release(endpointId);
+        service.releaseForTarget(endpointId);
 
         assertEquals(0.0, meterRegistry.get("webhook_concurrency_active_permits").gauge().value());
     }

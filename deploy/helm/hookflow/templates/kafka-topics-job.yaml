@@ -1,4 +1,16 @@
-{{- if .Values.kafka.enabled }}
+{{- /*
+  Guarded on createTopics and a known broker, not on kafka.enabled.
+
+  It used to be `if .Values.kafka.enabled`, which never rendered anywhere it
+  could work: enabled=false (the only supported setting since the subchart was
+  dropped) skipped the job entirely, and enabled=true pointed
+  hookflow.kafka.bootstrapServers at an in-chart broker this chart no longer
+  deploys. So the README's "topics are created automatically" was true of no
+  configuration, and the apps were left relying on broker auto-create — which
+  silently applies the broker's default partition count instead of
+  kafka.topicPartitions.
+*/}}
+{{- if and .Values.kafka.createTopics (include "hookflow.kafka.bootstrapServers" .) }}
 apiVersion: batch/v1
 kind: Job
 metadata:

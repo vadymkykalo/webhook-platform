@@ -4,11 +4,12 @@ import { endpointsApi } from './endpoints.api';
 import { deliveriesApi, type DeliveryFilters, type BulkReplayRequest } from './deliveries.api';
 import { eventsApi } from './events.api';
 import { subscriptionsApi, type SubscriptionRequest } from './subscriptions.api';
-import { membersApi, type MembershipRole, type AddMemberRequest } from './members.api';
-import { apiKeysApi, type ApiKeyRequest } from './apiKeys.api';
+import { membersApi, type MembershipRole } from './members.api';
+import { authApi } from './auth.api';
+import { organizationsApi } from './organizations.api';
 import { dashboardApi } from './dashboard.api';
 import { dlqApi, type DlqFilters } from './dlq.api';
-import { testEndpointsApi } from './testEndpoints.api';
+import { incomingDlqApi, type IncomingDlqFilters } from './incomingDlq.api';
 import { auditLogApi, type AuditLogFilters } from './auditLog.api';
 import { incomingSourcesApi } from './incomingSources.api';
 import { incomingDestinationsApi } from './incomingDestinations.api';
@@ -54,8 +55,20 @@ export const queryKeys = {
     apiKeys: {
         paged: (projectId: string, page: number, size: number) => ['api-keys', projectId, page, size] as const,
     },
+    // Account-level rather than organization-level: a user's sessions and their organizations
+    // are both things they hold across tenants, so neither key carries an organization.
+    sessions: {
+        all: ['auth', 'sessions'] as const,
+    },
+    organizations: {
+        mine: ['organizations', 'mine'] as const,
+    },
     dlq: {
         list: (projectId: string, page: number, size: number, filters?: DlqFilters) => ['dlq', projectId, page, size, filters ?? {}] as const,
+    },
+    incomingDlq: {
+        list: (projectId: string, page: number, size: number, filters?: IncomingDlqFilters) => ['incoming-dlq', projectId, page, size, filters ?? {}] as const,
+        stats: (projectId: string) => ['incoming-dlq', projectId, 'stats'] as const,
     },
     testEndpoints: {
         list: (projectId: string) => ['test-endpoints', projectId] as const,
@@ -220,12 +233,6 @@ export function useRotateSecret(projectId: string) {
     });
 }
 
-export function useTestEndpointAction(projectId: string) {
-    return useMutation({
-        mutationFn: (id: string) => endpointsApi.test(projectId, id),
-    });
-}
-
 export function useVerifyEndpoint(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -257,14 +264,6 @@ export function useDeliveries(projectId: string | undefined, filters: DeliveryFi
             );
             return hasActive ? 5000 : false;
         },
-    });
-}
-
-export function useReplayDelivery() {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (deliveryId: string) => deliveriesApi.replay(deliveryId),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['deliveries'] }); },
     });
 }
 
@@ -305,22 +304,6 @@ export function useSubscriptions(projectId: string | undefined) {
     });
 }
 
-export function useCreateSubscription(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (data: SubscriptionRequest) => subscriptionsApi.create(projectId, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) }); },
-    });
-}
-
-export function useUpdateSubscription(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: SubscriptionRequest }) => subscriptionsApi.update(projectId, id, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) }); },
-    });
-}
-
 export function usePatchSubscription(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -347,19 +330,19 @@ export function useMembers(orgId: string | undefined) {
     });
 }
 
-export function useAddMember(orgId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (data: AddMemberRequest) => membersApi.add(orgId, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
-    });
-}
-
 export function useChangeMemberRole(orgId: string) {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: ({ userId, role }: { userId: string; role: MembershipRole }) =>
             membersApi.changeRole(orgId, userId, { role }),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
+    });
+}
+
+export function useReissueInvite(orgId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => membersApi.reissueInvite(orgId, userId),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
     });
 }
@@ -372,30 +355,58 @@ export function useRemoveMember(orgId: string) {
     });
 }
 
+export function useSuspendMember(orgId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => membersApi.suspend(orgId, userId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
+    });
+}
+
+export function useReinstateMember(orgId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => membersApi.reinstate(orgId, userId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
+    });
+}
+
 // ─── API Keys ──────────────────────────────────────────────────────
 
-export function useApiKeysPaged(projectId: string | undefined, page: number, size = 20) {
+// ─── Sessions ──────────────────────────────────────────────────────
+
+export function useSessions() {
     return useQuery({
-        queryKey: queryKeys.apiKeys.paged(projectId!, page, size),
-        queryFn: () => apiKeysApi.listPaged(projectId!, page, size),
-        enabled: !!projectId,
+        queryKey: queryKeys.sessions.all,
+        queryFn: () => authApi.listSessions(),
+        // A stale session list is worse than a slow one: it invites somebody to revoke a device
+        // that is already gone, or to miss one that is not.
         staleTime: 0,
     });
 }
 
-export function useCreateApiKey(projectId: string) {
+export function useRevokeSession() {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (data: ApiKeyRequest) => apiKeysApi.create(projectId, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
+        mutationFn: (sessionId: string) => authApi.revokeSession(sessionId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.sessions.all }); },
     });
 }
 
-export function useRevokeApiKey(projectId: string) {
+export function useRevokeAllSessions() {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (id: string) => apiKeysApi.revoke(projectId, id),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
+        mutationFn: () => authApi.revokeAllSessions(),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.sessions.all }); },
+    });
+}
+
+// ─── Organizations ─────────────────────────────────────────────────
+
+export function useOrganizations() {
+    return useQuery({
+        queryKey: queryKeys.organizations.mine,
+        queryFn: () => organizationsApi.list(),
     });
 }
 
@@ -441,40 +452,49 @@ export function useDlqPurge(projectId: string) {
     });
 }
 
-// ─── Test Endpoints ────────────────────────────────────────────────
+// ─── Incoming DLQ ──────────────────────────────────────────────────
 
-export function useTestEndpoints(projectId: string | undefined) {
+export function useIncomingDlq(projectId: string | undefined, page: number, size = 20, filters?: IncomingDlqFilters) {
     return useQuery({
-        queryKey: queryKeys.testEndpoints.list(projectId!),
-        queryFn: () => testEndpointsApi.list(projectId!),
+        queryKey: queryKeys.incomingDlq.list(projectId!, page, size, filters),
+        queryFn: () => incomingDlqApi.list(projectId!, page, size, filters),
         enabled: !!projectId,
     });
 }
 
-export function useTestEndpointRequests(projectId: string | undefined, endpointId: string | undefined) {
+export function useIncomingDlqStats(projectId: string | undefined) {
     return useQuery({
-        queryKey: queryKeys.testEndpoints.requests(projectId!, endpointId!),
-        queryFn: () => testEndpointsApi.getRequests(projectId!, endpointId!),
-        enabled: !!projectId && !!endpointId,
-        refetchInterval: 5000,
+        queryKey: queryKeys.incomingDlq.stats(projectId!),
+        queryFn: () => incomingDlqApi.getStats(projectId!),
+        enabled: !!projectId,
     });
 }
 
-export function useCreateTestEndpoint(projectId: string) {
+export function useIncomingDlqRetry(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: () => testEndpointsApi.create(projectId),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId) }); },
+        mutationFn: (forwardAttemptId: string) => incomingDlqApi.retrySingle(projectId, forwardAttemptId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-dlq', projectId] }); },
     });
 }
 
-export function useDeleteTestEndpoint(projectId: string) {
+export function useIncomingDlqBulkRetry(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (id: string) => testEndpointsApi.delete(projectId, id),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId) }); },
+        mutationFn: (ids: string[]) => incomingDlqApi.retryBulk(projectId, ids),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-dlq', projectId] }); },
     });
 }
+
+export function useIncomingDlqPurge(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => incomingDlqApi.purgeAll(projectId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-dlq', projectId] }); },
+    });
+}
+
+// ─── Test Endpoints ────────────────────────────────────────────────
 
 // ─── Audit Log ─────────────────────────────────────────────────────
 
@@ -572,14 +592,6 @@ export function useIncomingEvents(projectId: string | undefined, filters: Incomi
     });
 }
 
-export function useIncomingEvent(projectId: string | undefined, id: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.incomingEvents.detail(projectId!, id!),
-        queryFn: () => incomingEventsApi.get(projectId!, id!),
-        enabled: !!projectId && !!id,
-    });
-}
-
 export function useIncomingEventAttempts(projectId: string | undefined, eventId: string | undefined) {
     return useQuery({
         queryKey: queryKeys.incomingEvents.attempts(projectId!, eventId!),
@@ -618,6 +630,22 @@ export function useCreateEventType(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: (data: EventTypeCatalogRequest) => schemasApi.createEventType(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) }); },
+    });
+}
+
+/**
+ * Rename an event type, or give it the description it never got.
+ *
+ * <p>`PUT /schemas/{eventTypeId}` shipped with the rest of the registry and was
+ * never called, so a typo in an event type's name was permanent: the catalogue
+ * could create and delete, and nothing in between.
+ */
+export function useUpdateEventType(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: EventTypeCatalogRequest }) =>
+            schemasApi.updateEventType(projectId, id, data),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) }); },
     });
 }
@@ -834,14 +862,6 @@ export function useTransformations(projectId: string) {
     });
 }
 
-export function useTransformation(projectId: string, id: string) {
-    return useQuery({
-        queryKey: queryKeys.transformations.detail(projectId, id),
-        queryFn: () => transformationsApi.get(projectId, id),
-        enabled: !!projectId && !!id,
-    });
-}
-
 export function useCreateTransformation(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -899,14 +919,6 @@ export function useRules(projectId: string) {
         queryKey: queryKeys.rules.list(projectId),
         queryFn: () => rulesApi.list(projectId),
         enabled: !!projectId,
-    });
-}
-
-export function useRule(projectId: string, id: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.rules.detail(projectId, id!),
-        queryFn: () => rulesApi.get(projectId, id!),
-        enabled: !!projectId && !!id,
     });
 }
 

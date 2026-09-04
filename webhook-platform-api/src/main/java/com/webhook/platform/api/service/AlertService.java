@@ -21,8 +21,9 @@ import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.dto.AlertRuleResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
-import lombok.RequiredArgsConstructor;
+import com.webhook.platform.common.security.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AlertService {
 
     private final AlertRuleRepository ruleRepository;
@@ -43,6 +43,40 @@ public class AlertService {
     private final IncidentRepository incidentRepository;
     private final IncidentTimelineRepository timelineRepository;
     private final AlertNotificationService notificationService;
+    private final boolean allowPrivateIps;
+    private final List<String> allowedHosts;
+
+    public AlertService(
+            AlertRuleRepository ruleRepository,
+            AlertEventRepository eventRepository,
+            ProjectRepository projectRepository,
+            IncidentRepository incidentRepository,
+            IncidentTimelineRepository timelineRepository,
+            AlertNotificationService notificationService,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+        this.ruleRepository = ruleRepository;
+        this.eventRepository = eventRepository;
+        this.projectRepository = projectRepository;
+        this.incidentRepository = incidentRepository;
+        this.timelineRepository = timelineRepository;
+        this.notificationService = notificationService;
+        this.allowPrivateIps = allowPrivateIps;
+        this.allowedHosts = allowedHosts;
+    }
+
+    /**
+     * A rule's notification webhook is a URL this server fetches on the user's behalf, which
+     * makes it an SSRF sink exactly like an Endpoint's url — and it was the one outbound URL in
+     * the product that nothing validated. Blank is not a bad URL: updateRule reads it as "unset
+     * this", and validating it would leave no way to remove a URL already stored.
+     */
+    private void validateNotificationUrl(String webhookUrl) {
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            return;
+        }
+        UrlValidator.validateWebhookUrl(webhookUrl, allowPrivateIps, allowedHosts);
+    }
 
     // ─── Rule CRUD ──────────────────────────────────────────────────────
 
@@ -58,6 +92,7 @@ public class AlertService {
     @Transactional
     public AlertRuleResponse createRule(UUID projectId, AlertRuleRequest request) {
         validateProjectAccess(projectId);
+        validateNotificationUrl(request.getWebhookUrl());
 
         AlertRule rule = AlertRule.builder()
                 .projectId(projectId)
@@ -85,6 +120,8 @@ public class AlertService {
     @Transactional
     public AlertRuleResponse updateRule(UUID projectId, UUID ruleId, AlertRuleRequest request) {
         validateProjectAccess(projectId);
+
+        validateNotificationUrl(request.getWebhookUrl());
 
         AlertRule rule = ruleRepository.findByIdAndProjectId(ruleId, projectId)
                 .orElseThrow(() -> new NotFoundException("Alert rule not found"));

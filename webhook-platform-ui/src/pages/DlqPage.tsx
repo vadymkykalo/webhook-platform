@@ -21,6 +21,7 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
+import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 
 
 /** A number worth reading on its own, in the machine voice. */
@@ -51,6 +52,7 @@ export default function DlqPage() {
   const [dateTo, setDateTo] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
 
   const dlqFilters = {
     endpointId: endpointFilter || undefined,
@@ -151,7 +153,6 @@ export default function DlqPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
-        title={t('dlq.pageTitle')}
         description={<Trans i18nKey="dlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
           <PermissionGate allowed={canManageDlq}>
@@ -239,11 +240,12 @@ export default function DlqPage() {
                   return (
                     <TableRow
                       key={item.deliveryId}
-                      className="group/row"
+                      className="group/row cursor-pointer"
                       data-state={selectedIds.has(item.deliveryId) ? 'selected' : undefined}
+                      onClick={() => setSelectedDeliveryId(item.deliveryId)}
                     >
                       {canManageDlq && (
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <SelectBox
                             checked={selectedIds.has(item.deliveryId)}
                             onChange={() => toggleRow(item.deliveryId)}
@@ -252,7 +254,7 @@ export default function DlqPage() {
                         </TableCell>
                       )}
                       <TableCell>
-                        <span className="flex flex-col gap-1">
+                        <span className="flex flex-col items-start gap-1">
                           <StatusBadge kind="halt" label={t('dlq.abandoned')} />
                           <span className="text-[11px] text-muted-foreground">
                             {t('dlq.ladderExhausted', { count: item.attemptCount })}
@@ -283,7 +285,7 @@ export default function DlqPage() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => handleReplaySingle(item.deliveryId)}
+                            onClick={(e) => { e.stopPropagation(); handleReplaySingle(item.deliveryId); }}
                             disabled={replaying}
                             title={t('dlq.replayOne')}
                             aria-label={t('dlq.replayOne')}
@@ -309,6 +311,18 @@ export default function DlqPage() {
           />
         </div>
       )}
+
+      {/* A DLQ item is a Delivery that ran out of ladder, and the sheet that
+          shows a Delivery's whole attempt history — every request, every
+          response, replay — already exists. `dlqApi.getItem` returns the same
+          nine fields the row above already has, so calling it would cost a
+          request and tell the reader nothing new. */}
+      <DeliveryDetailsSheet
+        deliveryId={selectedDeliveryId}
+        open={!!selectedDeliveryId}
+        onClose={() => setSelectedDeliveryId(null)}
+        onRefresh={() => { refetchDlq(); refetchStats(); }}
+      />
 
       <DangerConfirmDialog
         open={showPurgeDialog}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -28,6 +29,9 @@ vi.mock('../../api/alerts.api', () => ({
 vi.mock('../../api/incidents.api', () => ({
   incidentsApi: { countOpen: vi.fn() },
 }));
+vi.mock('../../api/incomingSources.api', () => ({
+  incomingSourcesApi: { list: vi.fn() },
+}));
 
 import DashboardPage from '../DashboardPage';
 import { projectsApi } from '../../api/projects.api';
@@ -36,6 +40,7 @@ import { endpointsApi } from '../../api/endpoints.api';
 import { deliveriesApi } from '../../api/deliveries.api';
 import { alertsApi } from '../../api/alerts.api';
 import { incidentsApi } from '../../api/incidents.api';
+import { incomingSourcesApi } from '../../api/incomingSources.api';
 
 const PROJECT: ProjectResponse = {
   id: TEST_PROJECT_ID,
@@ -92,7 +97,47 @@ describe('DashboardPage', () => {
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(EMPTY_PAGE);
     vi.mocked(alertsApi.unresolvedCount).mockResolvedValue({ count: 0 });
     vi.mocked(incidentsApi.countOpen).mockResolvedValue({ count: 0 });
+    vi.mocked(incomingSourcesApi.list).mockResolvedValue({
+      content: [], totalElements: 0, totalPages: 0, size: 20, number: 0, first: true, last: true,
+    });
+    localStorage.clear();
   });
+
+  it('opens nothing over the dashboard on a first visit', async () => {
+    // A seven-step tour used to mount itself here before the page had even
+    // finished loading, and it created nothing once you had read it.
+    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
+    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
+    renderDashboard();
+    await screen.findByText(/Getting started/i, undefined, { timeout: SETTLE_MS });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  }, TEST_TIMEOUT_MS);
+
+  it('leaves the single call to action to the empty state when there is no project', async () => {
+    // The card used to render a "create a project" row beside the page's own
+    // "create a project" button — two invitations to one act.
+    vi.mocked(projectsApi.list).mockResolvedValue([]);
+    renderDashboard();
+    await screen.findByText(/no projects yet/i);
+    expect(screen.queryByText(/Getting started/i)).toBeNull();
+  });
+
+  it('offers a way back after the getting-started card is dismissed', async () => {
+    // Dismissing used to be terminal: one localStorage boolean, no control
+    // anywhere in the UI that could unset it.
+    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
+    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }, { timeout: SETTLE_MS }));
+    const restore = await screen.findByRole('button', { name: /Getting started/ });
+
+    await user.click(restore);
+    // A brand-new account has no direction to infer, so the returning card
+    // asks — which is the card, back.
+    expect(await screen.findByText('What brings you to Hookflow?')).toBeInTheDocument();
+  }, TEST_TIMEOUT_MS);
 
   it('renders a loading skeleton before the project list arrives', () => {
     vi.mocked(projectsApi.list).mockReturnValue(new Promise(() => {}));

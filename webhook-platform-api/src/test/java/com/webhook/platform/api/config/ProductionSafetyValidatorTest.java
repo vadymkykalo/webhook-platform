@@ -20,7 +20,6 @@ class ProductionSafetyValidatorTest {
     private static final String STRONG_SECRET_3 = "wF4tR9nB2kL7xQ5mP8sV1yC6dH3jG0zA9eU4iO7rT2w";
     private static final String STRONG_SECRET_4 = "pL8xC3vN6bM1kQ9wR4tY7sD2fG5jH0zA3eU8iO1rW6t";
     private static final String STRONG_SECRET_5 = "zA5eU2iO9rW6tF3nB8kL1xQ4mP7sV0yC6dH9jG2zA5e";
-    private static final String STRONG_SECRET_6 = "nB9kL4xQ1mP6sV3yC8dH5jG0zA7eU2iO9rW4tF1nB6k";
 
     private ProductionSafetyValidator newValidator() {
         return new ProductionSafetyValidator();
@@ -33,7 +32,6 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(v, "jwtSecret", STRONG_SECRET_3);
         ReflectionTestUtils.setField(v, "dbPassword", STRONG_SECRET_4);
         ReflectionTestUtils.setField(v, "redisPassword", STRONG_SECRET_5);
-        ReflectionTestUtils.setField(v, "minioRootPassword", STRONG_SECRET_6);
         ReflectionTestUtils.setField(v, "corsAllowedOrigins", "https://app.example.com");
         ReflectionTestUtils.setField(v, "allowPrivateIps", false);
         ReflectionTestUtils.setField(v, "swaggerEnabled", false);
@@ -99,7 +97,7 @@ class ProductionSafetyValidatorTest {
         // should not fail startup a second time over an empty string.
         ProductionSafetyValidator v = newValidator();
         setValid(v);
-        ReflectionTestUtils.setField(v, "minioRootPassword", "");
+        ReflectionTestUtils.setField(v, "redisPassword", "");
 
         assertDoesNotThrow(v::validateProductionConfig);
     }
@@ -154,16 +152,6 @@ class ProductionSafetyValidatorTest {
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, v::validateProductionConfig);
         assertTrue(ex.getMessage().contains("POSTGRES_PASSWORD"));
-    }
-
-    @Test
-    void testProduction_unchangedMinioRootPasswordFromEnvDist_rejected() {
-        ProductionSafetyValidator v = newValidator();
-        setValid(v);
-        ReflectionTestUtils.setField(v, "minioRootPassword", "minio_dev_password_12345");
-
-        IllegalStateException ex = assertThrows(IllegalStateException.class, v::validateProductionConfig);
-        assertTrue(ex.getMessage().contains("MINIO_ROOT_PASSWORD"));
     }
 
     // -----------------------------------------------------------------

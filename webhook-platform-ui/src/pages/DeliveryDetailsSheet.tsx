@@ -9,6 +9,8 @@ import { incidentsApi } from '../api/incidents.api';
 import type { DryRunReplayResponse } from '../api/deliveries.api';
 import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
+import JsonBlock from '../components/JsonBlock';
+import { formatJson } from '../lib/json';
 import { Badge } from '../components/ui/badge';
 import AttemptRail from '../components/AttemptRail';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -547,10 +549,10 @@ export default function DeliveryDetailsSheet({
                             </summary>
                             <div className="grid grid-cols-2 gap-2 mt-2">
                               <pre className="max-h-32 overflow-x-auto rounded border border-halt/30 bg-halt-soft p-2 font-mono text-[10px]">
-                                {(() => { try { return JSON.stringify(JSON.parse(leftBody), null, 2); } catch { return leftBody; } })()}
+                                {formatJson(leftBody)}
                               </pre>
                               <pre className="max-h-32 overflow-x-auto rounded border border-ok/30 bg-ok-soft p-2 font-mono text-[10px]">
-                                {(() => { try { return JSON.stringify(JSON.parse(rightBody), null, 2); } catch { return rightBody; } })()}
+                                {formatJson(rightBody)}
                               </pre>
                             </div>
                           </details>
@@ -676,50 +678,21 @@ export default function DeliveryDetailsSheet({
                                     </div>
                                   )}
 
-                                  {/* Collapsible request/response details */}
-                                  <div className="space-y-1 mt-2">
+                                  {/* What was sent and what came back. Collapsed:
+                                      four of these per attempt, and an attempt
+                                      list is unreadable with them all open. */}
+                                  <div className="mt-2 space-y-1">
                                     {attempt.requestHeaders && (
-                                      <details>
-                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                                          {t('deliveryDetails.requestHeaders')}
-                                        </summary>
-                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
-                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.requestHeaders), null, 2); } catch { return attempt.requestHeaders; } })()}
-                                        </pre>
-                                      </details>
+                                      <JsonBlock collapsible label={t('deliveryDetails.requestHeaders')} value={attempt.requestHeaders} maxHeight="max-h-32" />
                                     )}
-
                                     {attempt.requestBody && (
-                                      <details>
-                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                                          {t('deliveryDetails.requestBody')}
-                                        </summary>
-                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
-                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.requestBody), null, 2); } catch { return attempt.requestBody; } })()}
-                                        </pre>
-                                      </details>
+                                      <JsonBlock collapsible label={t('deliveryDetails.requestBody')} value={attempt.requestBody} maxHeight="max-h-48" />
                                     )}
-
                                     {attempt.responseHeaders && (
-                                      <details>
-                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                                          {t('deliveryDetails.responseHeaders')}
-                                        </summary>
-                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
-                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.responseHeaders), null, 2); } catch { return attempt.responseHeaders; } })()}
-                                        </pre>
-                                      </details>
+                                      <JsonBlock collapsible label={t('deliveryDetails.responseHeaders')} value={attempt.responseHeaders} maxHeight="max-h-32" />
                                     )}
-
                                     {attempt.responseBody && (
-                                      <details>
-                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                                          {t('deliveryDetails.responseBody')}
-                                        </summary>
-                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
-                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.responseBody), null, 2); } catch { return attempt.responseBody; } })()}
-                                        </pre>
-                                      </details>
+                                      <JsonBlock collapsible label={t('deliveryDetails.responseBody')} value={attempt.responseBody} maxHeight="max-h-48" />
                                     )}
                                   </div>
                                 </div>

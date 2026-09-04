@@ -17,6 +17,7 @@ import { billingApi, PlanResponse, ResourceUsage } from '../api/billing.api';
 import { formatDate } from '../lib/date';
 import { cn } from '../lib/utils';
 import { showSuccess, showApiError } from '../lib/toast';
+import DangerConfirmDialog from '../components/DangerConfirmDialog';
 
 /** -1 is how the plan catalog spells "no ceiling". It must never reach a reader as "-1". */
 const UNLIMITED = (n: number) => n < 0;
@@ -148,6 +149,7 @@ const FEATURE_LABEL: Record<(typeof FEATURE_KEYS)[number], string> = {
 export default function BillingPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const { num, price } = useFormatters();
 
   const [billingEmail, setBillingEmail] = useState('');
@@ -188,6 +190,25 @@ export default function BillingPage() {
       }),
     onSuccess: (data) => { if (data.url) window.location.href = data.url; },
     onError: (err) => showApiError(err, 'billing.checkoutFailed'),
+  });
+
+  // Both of these shipped in billing.api.ts and were never called, which left
+  // billing a one-way door: an organization could start paying from here and
+  // had nowhere in the product to stop.
+  const portalMutation = useMutation({
+    mutationFn: () => billingApi.createPortal(`${window.location.origin}/admin/billing`),
+    onSuccess: (data) => { if (data.url) window.location.href = data.url; },
+    onError: (err) => showApiError(err, 'billing.portalFailed'),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => billingApi.cancelSubscription(),
+    onSuccess: () => {
+      showSuccess(t('billing.cancelled'));
+      setConfirmCancel(false);
+      queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+    onError: (err) => showApiError(err, 'billing.cancelFailed'),
   });
 
   const updateEmailMutation = useMutation({
@@ -427,6 +448,40 @@ export default function BillingPage() {
             </FormSection>
           )}
 
+          {!isSelfHosted && paid && (
+            <FormSection
+              title={t('billing.manageSubscription')}
+              description={t('billing.manageSubscriptionDesc')}
+            >
+              <div className="divide-y divide-rail">
+                <div className="flex flex-wrap items-center justify-between gap-4 pb-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{t('billing.openPortal')}</p>
+                    <p className="text-xs text-muted-foreground">{t('billing.openPortalHint')}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => portalMutation.mutate()}
+                    disabled={portalMutation.isPending}
+                  >
+                    {portalMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    <ExternalLink className="h-4 w-4" />
+                    {t('billing.openPortal')}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{t('billing.cancel')}</p>
+                    <p className="text-xs text-muted-foreground">{t('billing.cancelDesc')}</p>
+                  </div>
+                  <Button variant="outline" className="text-halt hover:bg-halt/10" onClick={() => setConfirmCancel(true)}>
+                    {t('billing.cancel')}
+                  </Button>
+                </div>
+              </div>
+            </FormSection>
+          )}
+
           {!isSelfHosted && (
             <FormSection title={t('billing.invoices')} description={t('billing.invoicesDesc')}>
               {invoices.length === 0 ? (
@@ -485,6 +540,18 @@ export default function BillingPage() {
           )}
         </div>
       </div>
+
+      <DangerConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title={t('billing.cancelTitle')}
+        description={t('billing.cancelBody')}
+        confirmName={plan?.displayName ?? ''}
+        impact={[t('billing.cancelImpact1'), t('billing.cancelImpact2'), t('billing.cancelImpact3')]}
+        onConfirm={() => cancelMutation.mutate()}
+        loading={cancelMutation.isPending}
+        confirmLabel={t('billing.cancel')}
+      />
     </div>
   );
 }

@@ -21,6 +21,8 @@ import { Textarea } from '../components/ui/textarea';
 import { cn } from '../lib/utils';
 import { usePermissions } from '../auth/usePermissions';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
+import SignatureSchemePicker, { sendsStandardHeaders } from '../components/SignatureSchemePicker';
+import type { SignatureScheme } from '../types/api.types';
 
 /**
  * Creating a connection.
@@ -164,6 +166,9 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
   const [creatingEndpoint, setCreatingEndpoint] = useState(false);
   const [endpointId, setEndpointId] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
+  const [standardSecret, setStandardSecret] = useState<string | null>(null);
+  const [signatureScheme, setSignatureScheme] = useState<SignatureScheme>('BOTH');
+  const [savingScheme, setSavingScheme] = useState(false);
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<EndpointTestResponse | null>(null);
@@ -200,6 +205,8 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
       });
       setEndpointId(endpoint.id);
       setSecret(endpoint.secret ?? generated);
+      setStandardSecret(endpoint.standardWebhooksSecret ?? null);
+      setSignatureScheme(endpoint.signatureScheme ?? 'BOTH');
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.list(projectId) });
       showSuccess(t('connectionSetup.toast.endpointCreated'));
       goNext();
@@ -207,6 +214,34 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
       showApiError(err, 'endpoints.toast.createFailed');
     } finally {
       setCreatingEndpoint(false);
+    }
+  };
+
+  /**
+   * The endpoint already exists by this step, so a change is a write, not a
+   * pending form value. `rateLimitPerSecond` is absent here only because the
+   * wizard has not offered it yet — the API reads that field unconditionally,
+   * so an update that omits one it *has* been given would clear it.
+   */
+  const handleSchemeChange = async (next: SignatureScheme) => {
+    if (!endpointId) return;
+    const previous = signatureScheme;
+    setSignatureScheme(next);
+    setSavingScheme(true);
+    try {
+      await endpointsApi.update(projectId, endpointId, {
+        url: url.trim(),
+        description: description.trim() || undefined,
+        enabled: true,
+        signatureScheme: next,
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.list(projectId) });
+    } catch (err) {
+      // A scheme the endpoint does not have must not go on looking chosen.
+      setSignatureScheme(previous);
+      showApiError(err, 'signatureScheme.saveFailed');
+    } finally {
+      setSavingScheme(false);
     }
   };
 
@@ -320,10 +355,24 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
           {secret ? (
             <>
               <SecretField secret={secret} label={t('connectionSetup.secret.label', 'Signing secret')} />
+              {/* Derived from the same secret, but the only form a Standard
+                  Webhooks library will take — and useless to an endpoint that
+                  is sent no Standard Webhooks headers. */}
+              {standardSecret && sendsStandardHeaders(signatureScheme) && (
+                <>
+                  <SecretField secret={standardSecret} label={t('connectionSetup.secret.standardLabel')} />
+                  <p className="text-xs text-muted-foreground">{t('connectionSetup.secret.standardHint')}</p>
+                </>
+              )}
               <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
                 <KeyRound className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
                 <p className="text-xs text-retry">{t('connectionSetup.steps.secret.warning')}</p>
               </div>
+              <SignatureSchemePicker
+                value={signatureScheme}
+                onChange={handleSchemeChange}
+                disabled={savingScheme || !canManageEndpoints}
+              />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.secret.pending')}</p>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
 import { formatDateTimeCompact } from '../lib/date';
 import { SkeletonTable } from '../components/PageSkeleton';
+import JsonBlock from '../components/JsonBlock';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
@@ -24,6 +25,7 @@ const ALL_ACTIONS = [
   'REGISTER', 'LOGIN', 'LOGOUT', 'CONFIGURE_MTLS', 'TEST_WEBHOOK',
   'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET', 'PASSWORD_CHANGED',
   'MEMBER_INVITED', 'MEMBER_ROLE_CHANGED', 'MEMBER_REMOVED',
+  'MEMBER_SUSPENDED', 'MEMBER_REINSTATED',
   'INVITE_ACCEPTED', 'RESOLVE_INCIDENT',
 ];
 
@@ -259,10 +261,7 @@ export default function AuditLogPage() {
               <DetailRow label={t('auditLog.columns.ip')} value={selected.clientIp || '—'} mono />
               {selected.details && (
                 <div className="pt-3">
-                  <p className="mono-label mb-1.5">{t('auditLog.detail.changes')}</p>
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-rail bg-secondary/60 p-3 font-mono text-[11px]">
-                    {(() => { try { return JSON.stringify(JSON.parse(selected.details), null, 2); } catch { return selected.details; } })()}
-                  </pre>
+                  <JsonBlock label={t('auditLog.detail.changes')} value={selected.details} maxHeight="max-h-48" />
                 </div>
               )}
               {selected.errorMessage && (

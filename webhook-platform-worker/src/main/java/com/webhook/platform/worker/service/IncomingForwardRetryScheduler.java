@@ -128,6 +128,7 @@ public class IncomingForwardRetryScheduler {
                             .destinationId(attempt.getDestinationId())
                             .attemptCount(attempt.getAttemptNumber())
                             .replay(false)
+                            .replaySessionId(attempt.getReplaySessionId())
                             .startedAt(attempt.getStartedAt())
                             .build();
 

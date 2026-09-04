@@ -10,6 +10,7 @@ import { deliveriesApi } from '../api/deliveries.api';
 import { debugLinksApi } from '../api/debugLinks.api';
 import { useQuery } from '@tanstack/react-query';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
+import { formatJson } from '../lib/json';
 import { showSuccess, showApiError } from '../lib/toast';
 import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -57,10 +58,7 @@ export default function EventDetailPage() {
     showSuccess(copiedMessage);
   };
 
-  const formatPayload = (payload: string | undefined) => {
-    if (!payload) return '';
-    try { return JSON.stringify(JSON.parse(payload), null, 2); } catch { return payload; }
-  };
+  const formatPayload = (payload: string | undefined) => (payload ? formatJson(payload) : '');
 
   const generateCurl = () => {
     if (!event) return '';
