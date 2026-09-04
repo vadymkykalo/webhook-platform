@@ -41,6 +41,22 @@ describe('PiiPreview', () => {
     expect(piiRulesApi.preview).toHaveBeenCalledWith(TEST_PROJECT_ID, expect.any(String));
   });
 
+  it('renders a preview the client handed back already parsed', async () => {
+    // The endpoint answers text/plain, but axios parses anything that looks
+    // like JSON regardless of content type — so this client resolved an object
+    // while its type said string. Rendering that threw React error #31 on the
+    // whole page.
+    vi.mocked(piiRulesApi.preview).mockResolvedValue(
+      { customer: { email: 'jo***@example.com' }, amount: 4900 } as unknown as string
+    );
+    const user = userEvent.setup();
+    render();
+
+    await user.click(screen.getByRole('button', { name: /Run preview/i }));
+
+    expect(await screen.findByText(/jo\*\*\*@example\.com/)).toBeInTheDocument();
+  });
+
   it('will not send a payload that is not JSON', async () => {
     const user = userEvent.setup();
     render();
