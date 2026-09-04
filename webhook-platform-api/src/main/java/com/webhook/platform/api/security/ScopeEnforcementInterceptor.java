@@ -84,6 +84,48 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     }
 
 
+    /**
+     * Refuses a write from an account that has not proved it owns its address.
+     *
+     * <p>This lived only in the browser: {@code VerificationGate.tsx} greys the buttons out, and
+     * the server issued an ordinary token to a {@code PENDING_VERIFICATION} account and asked
+     * nothing further — login refuses {@code DISABLED} and nothing else. Anyone reaching past
+     * the dashboard had the whole API.
+     *
+     * <p>Inert where verification is meaningless: with mail disabled, registration marks the
+     * account verified on the spot, because an unsent token proves nothing about an address and
+     * a gate with no key is just a locked-out user. So a self-hosted instance sees no change,
+     * and an instance with open registration and a free tier gets the rule it needs.
+     *
+     * <p>Hung off {@link RequireAccess} rather than a path list, so it covers exactly what
+     * writing covers. Reading stays open — the screen that tells the user to check their mail
+     * is a read, and so is every screen they might be looking at when they find out.
+     *
+     * <p>API keys are not re-checked: a key exists only because someone created one, and
+     * creating one is a write that passed this gate. Asking again would mean a user row read on
+     * the hot path of every ingest to re-answer a settled question.
+     */
+    void enforceVerifiedEmail(HandlerMethod handlerMethod, Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken jwt) || jwt.isEmailVerified()) {
+            return;
+        }
+
+        RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);
+        if (required == null) {
+            required = handlerMethod.getBeanType().getAnnotation(RequireAccess.class);
+        }
+        if (required == null || required.value() == AccessLevel.READ) {
+            return;
+        }
+
+        log.warn("Write refused: user {} has not verified its email address ({}.{})",
+                jwt.getUserId(), handlerMethod.getBeanType().getSimpleName(),
+                handlerMethod.getMethod().getName());
+        throw new ForbiddenException(
+                "Verify your email address before making changes. A new verification link can be "
+                        + "requested from the dashboard.");
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
@@ -94,6 +136,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
         enforceProjectScope(request, handlerMethod, authentication);
         enforceAccessLevel(handlerMethod, authentication);
+        enforceVerifiedEmail(handlerMethod, authentication);
 
         if (!(authentication instanceof ApiKeyAuthenticationToken apiKeyAuth)) {
             return true;

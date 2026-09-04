@@ -58,7 +58,7 @@ class AccessLevelEnforcementTest {
     }
 
     private static Authentication jwt(MembershipRole role) {
-        return new JwtAuthenticationToken(UUID.randomUUID(), UUID.randomUUID(), role, List.of());
+        return new JwtAuthenticationToken(UUID.randomUUID(), UUID.randomUUID(), role, true, List.of());
     }
 
     private static Authentication apiKey(ApiKeyScope scope) {

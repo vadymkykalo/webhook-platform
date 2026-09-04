@@ -123,7 +123,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
         // Approve the device code while acting in the client org context (a JWT scoped
         // to clientOrgId — exactly what the dashboard would present if the user had the
         // client org selected when they approved the CLI login).
-        String clientOrgToken = jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null);
+        String clientOrgToken = jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
         mockMvc.perform(post("/api/v1/auth/device/approve")
@@ -164,7 +164,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
         // a membership revoked between JWT issuance and the poll. The service must not
         // trust the org/role encoded on the JWT to imply real membership; it must fail
         // closed.
-        String bogusOrgToken = jwtUtil.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null);
+        String bogusOrgToken = jwtUtil.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
         mockMvc.perform(post("/api/v1/auth/device/approve")
