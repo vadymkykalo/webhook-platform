@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class VerificationGateTest {
 
-    private final ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor();
+    private final ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
 
     @RequireAccess(AccessLevel.WRITE)
     static class WriteHandler {
