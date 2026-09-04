@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDownCircle, ArrowUpCircle, Check, ChevronRight, Copy, GitCompareArrows,
-  History, Info, Loader2, Plus, Trash2,
+  History, Info, Loader2, Pencil, Plus, Trash2,
 } from 'lucide-react';
 import {
   useSchemaVersions, useCreateSchemaVersion, usePromoteSchema, useDeprecateSchema,
-  useSchemaChanges, useProjectSchemaChanges, useDeleteEventType,
+  useSchemaChanges, useProjectSchemaChanges, useDeleteEventType, useUpdateEventType,
 } from '../../api/queries';
 import { showApiError, showSuccess } from '../../lib/toast';
 import { formatDate } from '../../lib/date';
@@ -21,6 +21,9 @@ import { Button, buttonVariants } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select } from '../../components/ui/select';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '../../components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -123,6 +126,30 @@ export default function SchemaVersionHistory({
   const [tab, setTab] = useState<'versions' | 'changes'>('versions');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteMutation = useDeleteEventType(projectId);
+  const updateMutation = useUpdateEventType(projectId);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(eventType.name);
+  const [editDesc, setEditDesc] = useState(eventType.description ?? '');
+
+  const openEdit = () => {
+    setEditName(eventType.name);
+    setEditDesc(eventType.description ?? '');
+    setEditing(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editName.trim()) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: eventType.id,
+        data: { name: editName.trim(), description: editDesc.trim() || undefined },
+      });
+      setEditing(false);
+      showSuccess(t('schemas.editTypeSaved'));
+    } catch (err) {
+      showApiError(err, 'schemas.editTypeFailed');
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -156,16 +183,28 @@ export default function SchemaVersionHistory({
               )}
             </div>
           </div>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-muted-foreground hover:text-halt"
-            onClick={() => setConfirmDelete(true)}
-            title={t('schemas.deleteType')}
-            aria-label={t('schemas.deleteType')}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={openEdit}
+              title={t('schemas.editType')}
+              aria-label={t('schemas.editType')}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground hover:text-halt"
+              onClick={() => setConfirmDelete(true)}
+              title={t('schemas.deleteType')}
+              aria-label={t('schemas.deleteType')}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </header>
 
         <div className="flex gap-1 border-t border-rail px-3">
@@ -177,6 +216,40 @@ export default function SchemaVersionHistory({
       {tab === 'versions'
         ? <VersionList projectId={projectId} eventType={eventType} />
         : <ChangeList projectId={projectId} eventType={eventType} />}
+
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('schemas.editType')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="event-type-name">{t('schemas.typeName')}</Label>
+              <Input
+                id="event-type-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="event-type-description">{t('schemas.typeDescription')}</Label>
+              <Input
+                id="event-type-description"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleUpdate} disabled={!editName.trim() || updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

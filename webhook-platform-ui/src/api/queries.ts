@@ -751,6 +751,22 @@ export function useCreateEventType(projectId: string) {
     });
 }
 
+/**
+ * Rename an event type, or give it the description it never got.
+ *
+ * <p>`PUT /schemas/{eventTypeId}` shipped with the rest of the registry and was
+ * never called, so a typo in an event type's name was permanent: the catalogue
+ * could create and delete, and nothing in between.
+ */
+export function useUpdateEventType(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: EventTypeCatalogRequest }) =>
+            schemasApi.updateEventType(projectId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) }); },
+    });
+}
+
 export function useDeleteEventType(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
