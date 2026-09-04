@@ -69,8 +69,14 @@ jobs:
       - name: Validate rendered manifests against the Kubernetes schema
         run: |
           set -euo pipefail
-          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
-            | tar xz kubeconform
+          # Downloaded to a file rather than piped into tar: a retry cannot
+          # rescue a pipe, because tar has already read a truncated stream by
+          # the time curl starts over. This step failed exactly that way on
+          # 2026-09-04 ("Recv failure: Connection reset by peer").
+          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+            -o kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform.tar.gz kubeconform
           # -strict rejects unknown fields, which is what catches a typo'd key
           # that Helm renders happily and Kubernetes silently ignores.
           # ServiceMonitor/PrometheusRule are CRDs, hence the extra schema
@@ -1019,7 +1025,11 @@ jobs:
       
       - name: Install Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+          # Same reason as the kubeconform download: fetch, then run.
+          curl -sfL --retry 5 --retry-delay 2 --retry-all-errors \
+            -o install-trivy.sh \
+            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh
+          sudo sh install-trivy.sh -b /usr/local/bin
           trivy --version
       
       - name: Download Trivy DBs
