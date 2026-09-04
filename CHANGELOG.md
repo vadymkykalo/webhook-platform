@@ -41,6 +41,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   easily mistaken for decoration, so the contract is pinned by a test that covers each
   direction rather than left for whoever removes them to rediscover.
 
+### Security
+
+- **Email verification is enforced on the server.** It was a component in the dashboard:
+  `VerificationGate.tsx` greyed out the buttons, and login refused only `DISABLED`, so an
+  unverified account got an ordinary token and had the whole API with curl. Writes now require
+  a verified address; reads stay open, because the screen telling the user to check their mail
+  is a read. Inert where verification is meaningless — with mail off, registration marks the
+  account verified on the spot, so a self-hosted instance sees no change.
+
+- **A hosted deployment refuses to start half configured.** `BILLING_ENABLED` is the whole of
+  what separates hosted from self-hosted, which also means one unset variable away from an
+  open, unbilled, unverified service that starts happily. In production it now requires
+  `EMAIL_ENABLED=true` and a real payment provider: billing on with mail off is a paid tier
+  behind an address nobody proved they own, and billing on with the no-op provider is plans
+  enforced and never charged for.
+
+### Fixed
+
+- **`WEBHOOK_ALLOWED_HOSTS` reaches the connection it exempts.** The admission check honoured
+  the list and the post-connect check — the one that closes the DNS rebinding window — had no
+  idea it existed, so an operator who allow-listed an internal host watched every delivery to
+  it die at the TCP layer with nothing in the configuration to explain why. Both halves now
+  answer through one function. It failed closed, so this was a knob that did nothing rather
+  than a hole.
+
+- **The plan catalog answers an anonymous caller.** `/api/v1/billing/plans` is permitted and
+  a comment called it public; it returned 500 to anyone without a token and always had, because
+  nothing set a tenant scope and the resolver refuses to guess. Only the dashboard called it,
+  from behind a login, which is why nobody noticed.
+
+- **A page's crash stays inside that page.** The app had one error boundary, at the root, so a
+  render error anywhere replaced the whole dashboard and the only way back was a reload.
+
+- **`DeliveryResponse.status` is typed as its enum.** The JSON is unchanged — Jackson writes an
+  enum as its name — but the published contract now names the five values, the generated
+  TypeScript narrows from `string` to a union, and the locale ratchet can finally cover the
+  most-rendered status label in the product.
+
+### Added
+
+- **Search on the members list**, which the API serves as one unpaginated array — so finding
+  someone meant scrolling.
+
+- **SDK unit tests run on every pull request.** They ran on a release tag and nightly, so a
+  change that broke one merged green.
+
+- **Five more interpolated locale namespaces are checked against the spec**, after 2.10.0
+  shipped four sets of raw translation keys to a customer's screen and guarded only those four.
+
 ## [2.10.0] - 2026-09-04
 
 Fifty-five commits since 2.9.1. The theme, if there is one, is closing the gap between what the
