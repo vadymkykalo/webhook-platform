@@ -571,36 +571,6 @@
     "yearly": "Yearly",
     "yearlySave": "Save ~17%"
   },
-  "breadcrumb": {
-    "alerts": "Alerts",
-    "analytics": "Analytics",
-    "api-keys": "API Keys",
-    "audit-log": "Audit Log",
-    "connection-setup": "Connection Setup",
-    "dashboard": "Dashboard",
-    "deliveries": "Deliveries",
-    "dlq": "Failed Messages",
-    "endpoints": "Endpoints",
-    "event-diff": "Event Diff",
-    "events": "Events",
-    "incidents": "Incidents",
-    "incoming-events": "Received",
-    "incoming-sources": "Sources",
-    "members": "Members",
-    "pii-rules": "PII Masking",
-    "projects": "Projects",
-    "replay": "Time Machine",
-    "rules": "Rules",
-    "schemas": "Schemas",
-    "settings": "Settings",
-    "subscriptions": "Subscriptions",
-    "test-console": "Test Console",
-    "test-endpoints": "Test Endpoints",
-    "transform-studio": "Transform Studio",
-    "transformations": "Transformations",
-    "usage": "Usage",
-    "workflows": "Workflows"
-  },
   "charts": {
     "empty": "Nothing to plot yet"
   },
@@ -645,6 +615,7 @@
     "copied": "Copied to clipboard",
     "copy": "Copy",
     "copyId": "Copy ID",
+    "copyNamed": "Copy {{label}}",
     "create": "Create",
     "creating": "Creating...",
     "delete": "Delete",
@@ -2975,7 +2946,6 @@
     "darkMode": "Dark mode",
     "dashboard": "Dashboard",
     "deliveries": "Deliveries",
-    "devTools": "Developer Tools",
     "develop": "Develop",
     "dlq": "Failed Messages",
     "documentation": "Documentation",
@@ -2984,8 +2954,6 @@
     "events": "Events",
     "expandSidebar": "Expand sidebar",
     "filterProjects": "Filter projects",
-    "hideAdvanced": "Hide Advanced Features",
-    "home": "Home",
     "incidents": "Incidents",
     "incoming": "Incoming",
     "incomingDlq": "Failed Forwards",
@@ -2997,7 +2965,6 @@
     "members": "Members",
     "metrics": "Metrics",
     "navigation": "Navigation",
-    "observability": "Observability",
     "openMenu": "Open menu",
     "operations": "Operations",
     "orgSettings": "Organization",
@@ -3008,7 +2975,6 @@
     "pipeline": "Pipeline",
     "profile": "Profile",
     "project": "Project",
-    "projects": "Projects",
     "recovery": "Recovery",
     "replay": "Time Machine",
     "resources": "Resources",
@@ -3024,7 +2990,6 @@
     "testConsole": "Test Console",
     "testEndpoints": "Test Endpoints",
     "toggleTheme": "Toggle theme",
-    "tools": "Tools",
     "transformStudio": "Transform Studio",
     "transformations": "Transformations",
     "tunnels": "Tunnels",
@@ -3265,11 +3230,6 @@
       "deleted": "Project deleted successfully",
       "idCopied": "Project ID copied to clipboard"
     }
-  },
-  "quickstartStatus": {
-    "delivered": "Delivered",
-    "failed": "Failed",
-    "retrying": "Retrying"
   },
   "relativeTime": {
     "daysAgo": "{{count}}d ago",
@@ -3548,6 +3508,7 @@
     "invalidJson": "Invalid JSON — please check your schema",
     "jsonSchema": "JSON Schema",
     "latestVersion": "Latest",
+    "loadFailed": "Could not load the event type catalogue.",
     "noChanges": "No schema changes recorded",
     "noChangesHint": "Changes appear when new schema versions are uploaded",
     "noEventTypes": "No event types registered",
@@ -3926,6 +3887,7 @@
       "server": "Something went wrong on our end. Please try again later.",
       "tooManyRequests": "Too many requests. Please wait a moment.",
       "unauthorized": "Session expired. Please sign in again.",
+      "unhandledMutation": "That didn't go through. Try again — the details are in the request that failed.",
       "validation": "Please check your input and try again."
     },
     "retry": "Retry"

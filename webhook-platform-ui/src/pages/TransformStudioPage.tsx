@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
+import { formatJson } from '../lib/json';
 import { useTransformPreview, useTransformations, useEvents, useEndpoints, useDeliveryDryRun } from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { SkeletonRows } from '../components/PageSkeleton';
@@ -141,10 +142,6 @@ export default function TransformStudioPage() {
     setRan(false);
     setDryRunResult(null);
     setSelectedTransformationId('');
-  };
-
-  const formatJson = (text: string) => {
-    try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; }
   };
 
   const handleLoadEvent = (payload: string) => {

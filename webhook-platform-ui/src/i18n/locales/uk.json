@@ -571,36 +571,6 @@
     "yearly": "Щорічно",
     "yearlySave": "Економія ~17%"
   },
-  "breadcrumb": {
-    "alerts": "Алерти",
-    "analytics": "Аналітика",
-    "api-keys": "API Ключі",
-    "audit-log": "Журнал дій",
-    "connection-setup": "Налаштування з'єднання",
-    "dashboard": "Дашборд",
-    "deliveries": "Доставки",
-    "dlq": "Невдалі повідомлення",
-    "endpoints": "Ендпоінти",
-    "event-diff": "Порівняння подій",
-    "events": "Події",
-    "incidents": "Інциденти",
-    "incoming-events": "Отримані",
-    "incoming-sources": "Джерела",
-    "members": "Учасники",
-    "pii-rules": "Маскування PII",
-    "projects": "Проєкти",
-    "replay": "Машина часу",
-    "rules": "Правила",
-    "schemas": "Схеми",
-    "settings": "Налаштування",
-    "subscriptions": "Підписки",
-    "test-console": "Тест-консоль",
-    "test-endpoints": "Тестові ендпоінти",
-    "transform-studio": "Студія трансформацій",
-    "transformations": "Трансформації",
-    "usage": "Використання",
-    "workflows": "Воркфлоу"
-  },
   "charts": {
     "empty": "Поки нема що показати"
   },
@@ -645,6 +615,7 @@
     "copied": "Скопійовано в буфер обміну",
     "copy": "Копіювати",
     "copyId": "Копіювати ID",
+    "copyNamed": "Копіювати {{label}}",
     "create": "Створити",
     "creating": "Створення...",
     "delete": "Видалити",
@@ -2975,7 +2946,6 @@
     "darkMode": "Темна тема",
     "dashboard": "Дашборд",
     "deliveries": "Доставки",
-    "devTools": "Інструменти розробника",
     "develop": "Розробка",
     "dlq": "Невдалі повідомлення",
     "documentation": "Документація",
@@ -2984,8 +2954,6 @@
     "events": "Події",
     "expandSidebar": "Розгорнути бічну панель",
     "filterProjects": "Фільтрувати проєкти",
-    "hideAdvanced": "Приховати розширені функції",
-    "home": "Головна",
     "incidents": "Інциденти",
     "incoming": "Вхідні",
     "incomingDlq": "Невдалі пересилання",
@@ -2997,7 +2965,6 @@
     "members": "Учасники",
     "metrics": "Метрики",
     "navigation": "Навігація",
-    "observability": "Моніторинг",
     "openMenu": "Відкрити меню",
     "operations": "Операції",
     "orgSettings": "Організація",
@@ -3008,7 +2975,6 @@
     "pipeline": "Пайплайн",
     "profile": "Профіль",
     "project": "Проєкт",
-    "projects": "Проєкти",
     "recovery": "Відновлення",
     "replay": "Машина часу",
     "resources": "Ресурси",
@@ -3024,7 +2990,6 @@
     "testConsole": "Тест-консоль",
     "testEndpoints": "Тестові ендпоінти",
     "toggleTheme": "Перемкнути тему",
-    "tools": "Інструменти",
     "transformStudio": "Студія трансформацій",
     "transformations": "Трансформації",
     "tunnels": "Тунелі",
@@ -3265,11 +3230,6 @@
       "deleted": "Проєкт успішно видалено",
       "idCopied": "ID проєкту скопійовано"
     }
-  },
-  "quickstartStatus": {
-    "delivered": "Доставлено",
-    "failed": "Помилка",
-    "retrying": "Повторна спроба"
   },
   "relativeTime": {
     "daysAgo": "{{count}}д тому",
@@ -3548,6 +3508,7 @@
     "invalidJson": "Невалідний JSON — перевірте вашу схему",
     "jsonSchema": "JSON Схема",
     "latestVersion": "Остання",
+    "loadFailed": "Не вдалося завантажити каталог типів подій.",
     "noChanges": "Змін схем не зафіксовано",
     "noChangesHint": "Зміни з'являються при завантаженні нових версій схем",
     "noEventTypes": "Типів подій не зареєстровано",
@@ -3926,6 +3887,7 @@
       "server": "Щось пішло не так на сервері. Спробуйте пізніше.",
       "tooManyRequests": "Забагато запитів. Зачекайте трохи.",
       "unauthorized": "Сесія закінчилась. Увійдіть знову.",
+      "unhandledMutation": "Не вдалося виконати. Спробуйте ще раз — подробиці в запиті, який не пройшов.",
       "validation": "Перевірте введені дані та спробуйте знову."
     },
     "retry": "Повторити"

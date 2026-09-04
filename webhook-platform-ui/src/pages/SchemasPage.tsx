@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { FileJson2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { useEventTypes } from '../api/queries';
 import type { EventTypeCatalogResponse } from '../api/schemas.api';
 import SchemaValidationPanel from './schemas/SchemaValidationPanel';
@@ -24,7 +24,7 @@ export default function SchemasPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const [selected, setSelected] = useState<EventTypeCatalogResponse | null>(null);
-  const { data: eventTypes = [], isLoading } = useEventTypes(projectId);
+  const { data: eventTypes = [], isLoading, isError, error, refetch, isFetching } = useEventTypes(projectId);
 
   if (!projectId) return null;
 
@@ -34,6 +34,24 @@ export default function SchemasPage() {
         <SkeletonCards count={1} height="h-36" cols="grid-cols-1" />
         <SkeletonCards count={2} height="h-80" cols="grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]" />
       </PageSkeleton>
+    );
+  }
+
+  // Without this the catalogue request failing falls through `data = []` and
+  // draws "0 event types" over an empty list — a down backend wearing the face
+  // of an empty project, which is the one thing EmptyState's own docblock says
+  // never to do.
+  if (isError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <PageHeader title={t('schemas.title')} description={t('schemas.subtitle')} />
+        <ErrorState
+          error={error}
+          fallbackKey="schemas.loadFailed"
+          onRetry={() => refetch()}
+          retrying={isFetching}
+        />
+      </div>
     );
   }
 

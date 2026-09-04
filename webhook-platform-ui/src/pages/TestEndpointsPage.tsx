@@ -17,6 +17,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 import { cn } from '../lib/utils';
+import { formatJson } from '../lib/json';
 
 /**
  * A throwaway URL that keeps whatever is posted to it.
@@ -317,7 +318,7 @@ export default function TestEndpointsPage() {
                           {req.body && (
                             <div className="space-y-1.5">
                               <p className="mono-label">{t('testEndpoints.body')}</p>
-                              <JsonEditor value={formatBody(req.body)} readOnly minHeight="140px" maxHeight="260px" />
+                              <JsonEditor value={formatJson(req.body)} readOnly minHeight="140px" maxHeight="260px" />
                             </div>
                           )}
                           {req.queryString && (
@@ -355,10 +356,3 @@ export default function TestEndpointsPage() {
   );
 }
 
-function formatBody(body: string): string {
-  try {
-    return JSON.stringify(JSON.parse(body), null, 2);
-  } catch {
-    return body;
-  }
-}

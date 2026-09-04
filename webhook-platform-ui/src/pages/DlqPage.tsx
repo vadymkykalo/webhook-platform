@@ -151,7 +151,6 @@ export default function DlqPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
-        title={t('dlq.pageTitle')}
         description={<Trans i18nKey="dlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
           <PermissionGate allowed={canManageDlq}>
@@ -252,7 +251,7 @@ export default function DlqPage() {
                         </TableCell>
                       )}
                       <TableCell>
-                        <span className="flex flex-col gap-1">
+                        <span className="flex flex-col items-start gap-1">
                           <StatusBadge kind="halt" label={t('dlq.abandoned')} />
                           <span className="text-[11px] text-muted-foreground">
                             {t('dlq.ladderExhausted', { count: item.attemptCount })}

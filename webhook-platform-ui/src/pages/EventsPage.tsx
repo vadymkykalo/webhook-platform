@@ -169,7 +169,6 @@ export default function EventsPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
-        title={t('events.outgoingTitle')}
         description={<Trans i18nKey="events.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={sendAction}
       />
