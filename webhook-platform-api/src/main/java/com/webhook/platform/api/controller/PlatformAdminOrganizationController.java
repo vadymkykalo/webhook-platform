@@ -4,6 +4,7 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.dto.AdminOrganizationResponse;
 import com.webhook.platform.api.dto.SuspendOrganizationRequest;
+import com.webhook.platform.api.dto.UsageResponse;
 import com.webhook.platform.api.security.ProjectScopeExempt;
 import com.webhook.platform.api.service.PlatformAdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -81,6 +82,21 @@ public class PlatformAdminOrganizationController {
     public ResponseEntity<AdminOrganizationResponse> getOrganization(
             @PathVariable("organizationId") UUID organizationId) {
         return ResponseEntity.ok(platformAdminService.getOrganization(organizationId));
+    }
+
+    @Operation(operationId = "adminGetOrganizationUsage",
+            summary = "What one organization has used",
+            description = "Events this billing period, endpoints, projects and members, each "
+                    + "against the limit their plan allows — the same numbers the tenant sees on "
+                    + "their own billing page, so a support conversation is about one set of "
+                    + "figures. Carries no customer data: counts and limits only.")
+    @ApiResponse(responseCode = "200", description = "Usage against the plan")
+    @ApiResponse(responseCode = "403", description = "Forbidden — requires the platform-admin operator credential")
+    @ApiResponse(responseCode = "404", description = "No such organization")
+    @GetMapping("/{organizationId}/usage")
+    public ResponseEntity<UsageResponse> getUsage(
+            @PathVariable("organizationId") UUID organizationId) {
+        return ResponseEntity.ok(platformAdminService.getUsage(organizationId));
     }
 
     @Operation(operationId = "adminSuspendOrganization",

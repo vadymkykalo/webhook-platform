@@ -3064,6 +3064,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/organizations/{organizationId}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What one organization has used
+         * @description Events this billing period, endpoints, projects and members, each against the limit their plan allows — the same numbers the tenant sees on their own billing page, so a support conversation is about one set of figures. Carries no customer data: counts and limits only.
+         */
+        get: operations["adminGetOrganizationUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/encryption/status": {
         parameters: {
             query?: never;
@@ -10730,6 +10750,46 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+        };
+    };
+    adminGetOrganizationUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage against the plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UsageResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform-admin operator credential */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UsageResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UsageResponse"];
                 };
             };
         };

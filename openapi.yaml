@@ -6205,6 +6205,44 @@ paths:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
       security:
       - platformAdminToken: []
+  /api/v1/admin/organizations/{organizationId}/usage:
+    get:
+      tags:
+      - Organization Admin
+      summary: What one organization has used
+      description: "Events this billing period, endpoints, projects and members, each\
+        \ against the limit their plan allows — the same numbers the tenant sees on\
+        \ their own billing page, so a support conversation is about one set of figures.\
+        \ Carries no customer data: counts and limits only."
+      operationId: adminGetOrganizationUsage
+      parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Usage against the plan
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+        "403":
+          description: Forbidden — requires the platform-admin operator credential
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+        "404":
+          description: No such organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+      security:
+      - platformAdminToken: []
   /api/v1/admin/encryption/status:
     get:
       tags:

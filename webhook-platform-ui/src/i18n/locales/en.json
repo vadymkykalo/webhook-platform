@@ -848,6 +848,7 @@
       "noTransformation": "None — send original payload",
       "payloadFields": "Payload fields (v{{version}})",
       "payloadTemplate": "Payload Template",
+      "payloadTemplateHint": "JSONPath: ${$.path}. Empty means the original payload is sent unchanged.",
       "retryDelays": "Retry Delays",
       "retryDelaysHint": "Seconds between retries",
       "selectEndpoint": "Select an endpoint...",
@@ -3819,6 +3820,7 @@
       "showHint": "Brings it back on every project you dismissed it for.",
       "title": "Getting started"
     },
+    "language": "Language",
     "newPassword": "New password",
     "newPasswordHint": "Min 8 characters, must include uppercase, lowercase, digit, and special character",
     "notifications": {
