@@ -562,7 +562,7 @@
     "planFeatures": "Plan Features",
     "portalFailed": "Could not open the billing portal.",
     "projects": "Projects",
-    "rateLimit": "Rate limit",
+    "rateLimit": "Ingest rate limit",
     "retention": "Retention",
     "save": "Save",
     "selfHosted": "Self-hosted mode — all features unlocked, no limits",
