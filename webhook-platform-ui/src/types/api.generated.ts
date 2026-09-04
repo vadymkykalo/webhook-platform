@@ -2509,7 +2509,7 @@ export interface paths {
         };
         /**
          * Count open incidents
-         * @description How many incidents are not yet resolved — for a badge, not a report.
+         * @description How many incidents are not yet resolved, how many are being investigated, and how many of them are critical — for a badge and the three tiles above the list, not a report. Every count spans the project, which is what separates them from anything derived from a page of it.
          */
         get: operations["countOpen"];
         put?: never;
@@ -4832,6 +4832,24 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        /** @description Unresolved incident counts for a project */
+        IncidentCountsResponse: {
+            /**
+             * Format: int64
+             * @description Incidents that are not resolved — OPEN and INVESTIGATING together
+             */
+            count?: number;
+            /**
+             * Format: int64
+             * @description Incidents someone is actively working
+             */
+            investigating?: number;
+            /**
+             * Format: int64
+             * @description Unresolved incidents at CRITICAL severity
+             */
+            critical?: number;
         };
         PageEventResponse: {
             /** Format: int32 */
@@ -9995,9 +10013,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: number;
-                    };
+                    "*/*": components["schemas"]["IncidentCountsResponse"];
                 };
             };
         };

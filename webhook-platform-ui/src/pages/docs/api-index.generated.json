@@ -3270,10 +3270,10 @@
             {
               "status": "200",
               "description": "OK",
-              "type": "map<string, integer (int64)>"
+              "type": "IncidentCountsResponse"
             }
           ],
-          "description": "How many incidents are not yet resolved — for a badge, not a report."
+          "description": "How many incidents are not yet resolved, how many are being investigated, and how many of them are critical — for a badge and the three tiles above the list, not a report. Every count spans the project, which is what separates them from anything derived from a page of it."
         }
       ]
     },
@@ -9016,6 +9016,26 @@
       }
     ],
     "Group": [],
+    "IncidentCountsResponse": [
+      {
+        "name": "count",
+        "type": "integer (int64)",
+        "required": false,
+        "description": "Incidents that are not resolved — OPEN and INVESTIGATING together"
+      },
+      {
+        "name": "investigating",
+        "type": "integer (int64)",
+        "required": false,
+        "description": "Incidents someone is actively working"
+      },
+      {
+        "name": "critical",
+        "type": "integer (int64)",
+        "required": false,
+        "description": "Unresolved incidents at CRITICAL severity"
+      }
+    ],
     "IncidentRequest": [
       {
         "name": "title",
@@ -13987,6 +14007,11 @@
       ]
     },
     "Group": {},
+    "IncidentCountsResponse": {
+      "count": 0,
+      "investigating": 0,
+      "critical": 0
+    },
     "IncidentRequest": {
       "title": "string",
       "severity": "INFO",
