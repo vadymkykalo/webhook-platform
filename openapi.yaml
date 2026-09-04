@@ -5243,7 +5243,10 @@ paths:
       tags:
       - Incidents
       summary: Count open incidents
-      description: "How many incidents are not yet resolved — for a badge, not a report."
+      description: "How many incidents are not yet resolved, how many are being investigated,\
+        \ and how many of them are critical — for a badge and the three tiles above\
+        \ the list, not a report. Every count spans the project, which is what separates\
+        \ them from anything derived from a page of it."
       operationId: countOpen
       parameters:
       - name: projectId
@@ -5258,10 +5261,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
-                additionalProperties:
-                  type: integer
-                  format: int64
+                $ref: "#/components/schemas/IncidentCountsResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -9302,6 +9302,22 @@ components:
           type: boolean
         empty:
           type: boolean
+    IncidentCountsResponse:
+      type: object
+      description: Unresolved incident counts for a project
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Incidents that are not resolved — OPEN and INVESTIGATING together
+        investigating:
+          type: integer
+          format: int64
+          description: Incidents someone is actively working
+        critical:
+          type: integer
+          format: int64
+          description: Unresolved incidents at CRITICAL severity
     PageEventResponse:
       type: object
       properties:
@@ -10024,6 +10040,10 @@ components:
           type: string
         status:
           type: string
+          enum:
+          - HEALTHY
+          - DEGRADED
+          - FAILING
     EventTypeBreakdown:
       type: object
       properties:
