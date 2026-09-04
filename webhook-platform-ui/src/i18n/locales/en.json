@@ -37,18 +37,24 @@
     "form": {
       "channel": "Notification Channel",
       "description": "Description (optional)",
+      "descriptionPlaceholder": "What this rule is for",
       "emailRecipients": "Email Recipients",
       "name": "Name",
+      "namePlaceholder": "High failure rate",
       "severity": "Severity",
       "slackHint": "Create an Incoming Webhook in your Slack workspace settings to get the URL.",
       "slackWebhookUrl": "Slack Webhook URL",
       "threshold": "Threshold",
       "type": "Alert Type",
       "webhookUrl": "Webhook URL",
-      "window": "Window (min)",
-      "namePlaceholder": "High failure rate",
-      "descriptionPlaceholder": "What this rule is for"
+      "window": "Window (min)"
     },
+    "history": {
+      "desc": "Every alert this project has raised, newest first",
+      "title": "What fired"
+    },
+    "investigate": "Investigate deliveries",
+    "loadFailed": "Couldn't load alerts for this project",
     "mute": "Mute",
     "muted": "Muted",
     "noEvents": "No alerts fired",
@@ -58,11 +64,18 @@
     "resolve": "Resolve",
     "resolveAll": "Resolve All",
     "resolved": "Resolved",
+    "resolvedAtLabel": "Resolved {{time}}",
+    "rules": {
+      "desc": "Conditions that raise an alert when they are met",
+      "title": "What is watching"
+    },
     "severities": {
       "CRITICAL": "Critical",
       "INFO": "Info",
       "WARNING": "Warning"
     },
+    "snooze": "Snooze",
+    "snoozeFor": "Snooze {{hours}}h",
     "snoozed": "Snoozed",
     "subtitle": "Monitor delivery health and get notified of issues",
     "tabs": {
@@ -70,6 +83,15 @@
       "rules": "Alert Rules"
     },
     "threshold": "Threshold",
+    "tiles": {
+      "allClear": "All clear",
+      "armed": "Armed rules",
+      "armedHint": "of {{total}} rules",
+      "silenced": "Silenced",
+      "silencedHint": "Muted, snoozed or turned off",
+      "unresolved": "Unresolved",
+      "unresolvedHint": "Alerts waiting on a decision"
+    },
     "title": "Alerts",
     "toast": {
       "allResolved": "{{count}} alerts resolved",
@@ -83,6 +105,8 @@
       "unmuted": "Rule unmuted",
       "updateFailed": "Failed to update alert rule"
     },
+    "toggleRule": "Enable {{name}}",
+    "triggeredBy": "Triggered by",
     "types": {
       "CONSECUTIVE_FAILURES": {
         "hint": "Triggers after N consecutive failures for an endpoint",
@@ -104,35 +128,11 @@
     "unmute": "Unmute",
     "unresolved": "unresolved",
     "window": "Window",
-    "loadFailed": "Couldn't load alerts for this project",
-    "resolvedAtLabel": "Resolved {{time}}",
-    "triggeredBy": "Triggered by",
-    "investigate": "Investigate deliveries",
-    "snooze": "Snooze",
-    "snoozeFor": "Snooze {{hours}}h",
-    "toggleRule": "Enable {{name}}",
-    "windowMinutes_one": "{{count}} minute",
-    "windowMinutes_other": "{{count}} minutes",
-    "tiles": {
-      "unresolved": "Unresolved",
-      "unresolvedHint": "Alerts waiting on a decision",
-      "allClear": "All clear",
-      "armed": "Armed rules",
-      "armedHint": "of {{total}} rules",
-      "silenced": "Silenced",
-      "silencedHint": "Muted, snoozed or turned off"
-    },
-    "history": {
-      "title": "What fired",
-      "desc": "Every alert this project has raised, newest first"
-    },
-    "rules": {
-      "title": "What is watching",
-      "desc": "Conditions that raise an alert when they are met"
-    },
     "windowMinutes": "{{count}} minutes",
     "windowMinutes_few": "{{count}} minutes",
-    "windowMinutes_many": "{{count}} minutes"
+    "windowMinutes_many": "{{count}} minutes",
+    "windowMinutes_one": "{{count}} minute",
+    "windowMinutes_other": "{{count}} minutes"
   },
   "analytics": {
     "avgLatency": "Avg Latency",
@@ -141,6 +141,11 @@
     "deliveryVolumeDesc": "Success vs Failed over time",
     "endpointPerformance": "Endpoint Performance",
     "endpointPerformanceDesc": "Health status and metrics",
+    "endpointStatus": {
+      "DEGRADED": "Degraded",
+      "FAILING": "Failing",
+      "HEALTHY": "Healthy"
+    },
     "epColumns": {
       "deliveries": "Deliveries",
       "endpoint": "Endpoint",
@@ -150,11 +155,14 @@
     },
     "eventTypes": "Event Types",
     "eventTypesDesc": "Distribution by type",
+    "eventTypesSeries": "Events",
     "events": "events",
     "failed": "Failed",
     "failureRate": "failure rate",
     "latencyPercentiles": "Latency Percentiles",
     "latencyPercentilesDesc": "Response time distribution",
+    "latencySeries": "Latency",
+    "loadFailed": "Couldn't load analytics for this project",
     "noData": "No Data Available",
     "noDataDesc": "Start sending webhook events to see analytics",
     "noDeliveryData": "No delivery data yet",
@@ -165,41 +173,34 @@
     "noLatencyDataDesc": "Metrics appear after deliveries",
     "noLatencyPercentiles": "No latency data",
     "of": "of",
+    "outcome": {
+      "delivered": "Delivered",
+      "desc": "Delivered and failed over the selected range",
+      "failed": "Failed",
+      "title": "Delivery outcome"
+    },
+    "periodLabel": "Time range",
+    "periods": {
+      "24h": "24h",
+      "30d": "30d",
+      "7d": "7d"
+    },
     "refresh": "Refresh",
     "responseLatency": "Response Latency",
     "responseLatencyDesc": "Average latency over time",
     "subtitle": "Real-time webhook delivery metrics",
     "successRate": "Success Rate",
     "throughput": "Throughput",
-    "title": "Analytics",
-    "loadFailed": "Couldn't load analytics for this project",
-    "periodLabel": "Time range",
-    "periods": {
-      "24h": "24h",
-      "7d": "7d",
-      "30d": "30d"
-    },
-    "outcome": {
-      "title": "Delivery outcome",
-      "desc": "Delivered and failed over the selected range",
-      "delivered": "Delivered",
-      "failed": "Failed"
-    },
-    "latencySeries": "Latency",
-    "eventTypesSeries": "Events",
     "tiles": {
-      "successRateHint": "{{delivered}} of {{total}} delivered",
-      "latencyHint": "p95 {{p95}} · p99 {{p99}}",
+      "failedBadge": "Retrying",
       "failedHint": "{{percent}}% of all deliveries",
-      "failedBadge": "Retrying"
+      "latencyHint": "p95 {{p95}} · p99 {{p99}}",
+      "successRateHint": "{{delivered}} of {{total}} delivered"
     },
-    "endpointStatus": {
-      "HEALTHY": "Healthy",
-      "DEGRADED": "Degraded",
-      "FAILING": "Failing"
-    }
+    "title": "Analytics"
   },
   "apiKeys": {
+    "activeKey": "Active",
     "createDialog": {
       "description": "Add a new API key to send events to this project",
       "expiration": "Expiration",
@@ -245,6 +246,8 @@
     "noKeysDescViewer": "No API keys have been created yet. Ask a Developer or Owner to create one.",
     "prefix": "Prefix",
     "projectNotFound": "Project not found",
+    "retiring": "Retiring",
+    "retiringHint": "Replaced by a newer key. This one keeps working until the time above, then stops.",
     "revoke": "Revoke",
     "revokeDialog": {
       "description": "This action cannot be undone. This API key will stop working immediately and all requests using it will be rejected.",
@@ -255,8 +258,23 @@
     },
     "revokeNamed": "Revoke {{name}}",
     "revoking": "Revoking...",
+    "rotate": "Rotate",
+    "rotateDialog": {
+      "description": "Issues a replacement key straight away. This key keeps working for the window you choose, so you can deploy the new one before the old one stops.",
+      "grace": "Keep the old key working for",
+      "grace0": "Not at all — stop it immediately",
+      "grace0Hint": "The old key stops working the moment you confirm. Choose this if it may have leaked.",
+      "grace168h": "7 days",
+      "grace1h": "1 hour",
+      "grace24h": "24 hours",
+      "grace72h": "3 days",
+      "graceHint": "Both keys authenticate during this window. Deploy the new key everywhere before it closes.",
+      "title": "Rotate {{name}}"
+    },
+    "rotateNamed": "Rotate {{name}}",
     "scopeReadOnly": "Read Only",
     "scopeReadWrite": "Read & Write",
+    "stopsWorking": "Stops working",
     "subtitle": "Manage API keys for <strong>{{project}}</strong>",
     "subtitlePlain": "Keys that authenticate calls to the API for this project.",
     "title": "API Keys",
@@ -268,24 +286,6 @@
       "revokeFailed": "Failed to revoke API key",
       "revoked": "API key revoked successfully",
       "rotateFailed": "Could not rotate the key. Please try again."
-    },
-    "activeKey": "Active",
-    "retiring": "Retiring",
-    "retiringHint": "Replaced by a newer key. This one keeps working until the time above, then stops.",
-    "stopsWorking": "Stops working",
-    "rotate": "Rotate",
-    "rotateNamed": "Rotate {{name}}",
-    "rotateDialog": {
-      "title": "Rotate {{name}}",
-      "description": "Issues a replacement key straight away. This key keeps working for the window you choose, so you can deploy the new one before the old one stops.",
-      "grace": "Keep the old key working for",
-      "grace0": "Not at all — stop it immediately",
-      "grace1h": "1 hour",
-      "grace24h": "24 hours",
-      "grace72h": "3 days",
-      "grace168h": "7 days",
-      "graceHint": "Both keys authenticate during this window. Deploy the new key everywhere before it closes.",
-      "grace0Hint": "The old key stops working the moment you confirm. Choose this if it may have leaked."
     }
   },
   "auditLog": {
@@ -360,13 +360,13 @@
       "confirmTitle": "Confirm Authorization",
       "confirmWarning": "Only approve if you initiated this request from the Hookflow CLI.",
       "continue": "Continue",
-      "deny": "This wasn't me",
       "denied": "Device authorization denied",
       "deniedDesc": "The CLI session was refused. Whoever asked for this code will not get in.",
       "deniedHint": "If you did not start this from a terminal of your own, change your password — someone else knows enough to ask.",
       "deniedTitle": "Authorization Denied",
-      "denying": "Denying...",
+      "deny": "This wasn't me",
       "denyFailed": "Failed to deny this device code. It may be invalid or already used.",
+      "denying": "Denying...",
       "errorTitle": "Authorization Failed",
       "failed": "Failed to authorize device. The code may be invalid or expired.",
       "goToDashboard": "Go to dashboard",
@@ -528,10 +528,10 @@
     "invoicePlan": "Plan",
     "invoiceStatus": "Status",
     "invoiceStatuses": {
-      "PAID": "Paid",
+      "DRAFT": "Draft",
       "OPEN": "Open",
-      "PAST_DUE": "Past due",
-      "DRAFT": "Draft"
+      "PAID": "Paid",
+      "PAST_DUE": "Past due"
     },
     "invoiceView": "View",
     "invoices": "Invoices",
@@ -554,8 +554,8 @@
     "selfHosted": "Self-hosted mode — all features unlocked, no limits",
     "statuses": {
       "ACTIVE": "Active",
-      "PAST_DUE": "Past due",
       "CANCELED": "Canceled",
+      "PAST_DUE": "Past due",
       "TRIALING": "Trial"
     },
     "subtitle": "Manage your plan and usage",
@@ -600,6 +600,9 @@
     "transformations": "Transformations",
     "usage": "Usage",
     "workflows": "Workflows"
+  },
+  "charts": {
+    "empty": "Nothing to plot yet"
   },
   "commandPalette": {
     "analytics": "Analytics",
@@ -712,6 +715,14 @@
     "finish": "Create connection",
     "next": "Continue",
     "pageDesc": "One endpoint, its signing secret and the event types it is subscribed to.",
+    "secret": {
+      "hide": "Hide secret",
+      "label": "Signing secret",
+      "reveal": "Reveal secret",
+      "standardHint": "The same secret in the form a Standard Webhooks library expects. Pass this one, whsec_ prefix included, to a Standard Webhooks verifier; pass the signing secret above to one written against X-Signature.",
+      "standardLabel": "Standard Webhooks secret"
+    },
+    "stepCounter": "Step {{n}} of {{total}} · {{name}}",
     "steps": {
       "events": {
         "add": "Add event type",
@@ -769,15 +780,7 @@
       "secretCopied": "Secret copied to clipboard",
       "subscriptionsCreated": "{{count}} subscription(s) created",
       "testPassed": "Test ping successful"
-    },
-    "secret": {
-      "hide": "Hide secret",
-      "label": "Signing secret",
-      "reveal": "Reveal secret",
-      "standardLabel": "Standard Webhooks secret",
-      "standardHint": "The same secret in the form a Standard Webhooks library expects. Pass this one, whsec_ prefix included, to a Standard Webhooks verifier; pass the signing secret above to one written against X-Signature."
-    },
-    "stepCounter": "Step {{n}} of {{total}} · {{name}}"
+    }
   },
   "connections": {
     "addSubscription": "Subscribe to an event type",
@@ -798,13 +801,6 @@
     "eventTypes": "{{count}} event types",
     "expand": "Show details",
     "expandFor": "Details for {{url}}",
-    "noSubscriptions": "No subscriptions",
-    "subDisabled": "Sub off",
-    "subscriptions": "{{count}} subscriptions",
-    "subtitle": "Visual overview of event routing for <strong>{{project}}</strong>",
-    "title": "Connection Map",
-    "unsubscribed": "Unsubscribed Endpoints",
-    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events",
     "health": {
       "halt": "Abandoned",
       "none": "No traffic yet",
@@ -813,11 +809,33 @@
     },
     "ladderLabel": "Retry ladder for {{url}}",
     "newConnection": "New connection",
+    "noSubscriptions": "No subscriptions",
     "noSubscriptionsDesc": "Nothing is subscribed, so this endpoint receives no events.",
     "secretHidden": "The secret is stored hashed and is shown once, when it is created or rotated. Rotate it if it may have leaked — the old secret stops working immediately.",
     "sendTest": "Send test event",
+    "standardSecretHidden": "The whsec_… form a Standard Webhooks library expects is derived from the same secret, and is shown beside it whenever the secret itself is.",
+    "subDisabled": "Sub off",
+    "subscriptions": "{{count}} subscriptions",
+    "subtitle": "Visual overview of event routing for <strong>{{project}}</strong>",
+    "title": "Connection Map",
     "toggleSubscription": "Enable {{eventType}}",
-    "standardSecretHidden": "The whsec_… form a Standard Webhooks library expects is derived from the same secret, and is shown beside it whenever the secret itself is."
+    "unsubscribed": "Unsubscribed Endpoints",
+    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events"
+  },
+  "contact": {
+    "communityBody": "Open an issue on GitHub — self-hosted questions get answered there too.",
+    "communityCta": "Open an issue",
+    "communityTitle": "Bugs and feature requests",
+    "docsBody": "Most integration questions are answered in the guides.",
+    "docsCta": "Go to the docs",
+    "docsTitle": "Read first",
+    "responseNote": "We answer on working days, usually within one.",
+    "salesBody": "Plans above Pro, annual billing and volume commitments.",
+    "salesTitle": "Sales",
+    "subtitle": "Enterprise plans, volume pricing, self-hosted support, or a question the docs did not answer.",
+    "supportBody": "Something is wrong with a delivery, an account or a bill.",
+    "supportTitle": "Support",
+    "title": "Talk to us"
   },
   "createSubscription": {
     "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
@@ -887,6 +905,15 @@
     "typeToConfirm": "Type \"{{name}}\" to confirm"
   },
   "dashboard": {
+    "attention": {
+      "alerts": "Unresolved alerts",
+      "clearBadge": "All clear",
+      "desc": "Work Hookflow has stopped doing on its own",
+      "dlq": "Abandoned in the DLQ",
+      "failed": "Failed, retrying",
+      "incidents": "Open incidents",
+      "title": "Needs a human"
+    },
     "createProject": "Create project",
     "endpointHealth": {
       "deliveries": "{{count}} deliveries",
@@ -896,8 +923,32 @@
       "success": "{{rate}}% success",
       "title": "Endpoint Health"
     },
+    "headline": "Delivery health",
+    "headlineDesc": "How your webhook traffic is doing right now.",
+    "inFlight": {
+      "desc": "Deliveries still walking the retry ladder",
+      "empty": "Nothing in flight",
+      "rail": "Attempt {{count}} of {{total}}",
+      "status": {
+        "DLQ": "Abandoned",
+        "FAILED": "Failed",
+        "PENDING": "Pending",
+        "PROCESSING": "Attempting",
+        "SUCCESS": "Delivered"
+      },
+      "title": "In flight"
+    },
     "noProjects": "No projects yet",
     "noProjectsDesc": "Create your first project to start sending webhooks and monitoring deliveries.",
+    "openAnalytics": "Open analytics",
+    "outcome": {
+      "delivered": "Delivered",
+      "desc": "Delivered and failed over the last 7 days",
+      "empty": "No deliveries in this window",
+      "failed": "Failed",
+      "title": "Delivery outcome"
+    },
+    "projectPicker": "Project",
     "quickActions": {
       "deliveries": "Deliveries",
       "dlq": "Failed Messages",
@@ -908,90 +959,57 @@
     },
     "recentEvents": {
       "delivery": "{{count}} delivery",
+      "deliveryCount": "{{count}} deliveries",
+      "deliveryCount_few": "{{count}} deliveries",
+      "deliveryCount_many": "{{count}} deliveries",
+      "deliveryCount_one": "{{count}} delivery",
+      "deliveryCount_other": "{{count}} deliveries",
       "delivery_other": "{{count}} deliveries",
       "empty": "No recent events",
       "emptyDesc": "Events will appear here when sent",
       "subtitle": "Latest webhook events",
-      "title": "Recent Events",
-      "deliveryCount_one": "{{count}} delivery",
-      "deliveryCount_other": "{{count}} deliveries",
-      "deliveryCount": "{{count}} deliveries",
-      "deliveryCount_few": "{{count}} deliveries",
-      "deliveryCount_many": "{{count}} deliveries"
+      "title": "Recent Events"
+    },
+    "share": {
+      "abandoned": "Abandoned",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "inFlight": "In flight"
     },
     "stats": {
+      "abandoned": "Abandoned",
+      "abandonedHint": "Retry ladder exhausted",
+      "delivered": "Delivered",
+      "deliveredHint": "{{percent}}% of everything sent",
+      "deliveries": "Deliveries",
       "dlq": "Failed Messages",
+      "dlqBadge": "In the DLQ",
       "dlqDesc": "Max retries exceeded",
       "failed": "Failed",
       "failedDesc": "Retriable failures",
+      "inFlight": "In flight",
+      "inFlightHint": "Still owed an attempt",
       "pending": "Pending",
       "pendingDesc": "In progress",
       "successRate": "{{rate}}% success rate",
       "successful": "Successful",
       "totalDeliveries": "Total Deliveries",
       "totalDeliveriesDesc": "Webhook deliveries sent",
-      "deliveries": "Deliveries",
-      "window": "Last 7 days",
-      "delivered": "Delivered",
-      "deliveredHint": "{{percent}}% of everything sent",
-      "inFlight": "In flight",
-      "inFlightHint": "Still owed an attempt",
-      "abandoned": "Abandoned",
-      "abandonedHint": "Retry ladder exhausted",
-      "dlqBadge": "In the DLQ"
+      "window": "Last 7 days"
     },
     "subtitle": "Overview of your Hookflow activity",
     "title": "Dashboard",
     "toast": {
       "loadFailed": "Failed to load dashboard data"
     },
-    "headline": "Delivery health",
-    "headlineDesc": "How your webhook traffic is doing right now.",
-    "openAnalytics": "Open analytics",
-    "projectPicker": "Project",
     "verdict": {
-      "label": "Success rate",
-      "ok": "Everything is landing",
-      "retry": "Some deliveries need attention",
+      "detail": "{{delivered}} of {{total}} deliveries landed.",
       "halt": "Deliveries are failing",
       "idle": "Nothing delivered yet",
-      "detail": "{{delivered}} of {{total}} deliveries landed.",
-      "idleDetail": "Send your first event and this fills in."
-    },
-    "outcome": {
-      "title": "Delivery outcome",
-      "desc": "Delivered and failed over the last 7 days",
-      "delivered": "Delivered",
-      "failed": "Failed",
-      "empty": "No deliveries in this window"
-    },
-    "share": {
-      "delivered": "Delivered",
-      "inFlight": "In flight",
-      "failed": "Failed",
-      "abandoned": "Abandoned"
-    },
-    "attention": {
-      "title": "Needs a human",
-      "desc": "Work Hookflow has stopped doing on its own",
-      "clearBadge": "All clear",
-      "dlq": "Abandoned in the DLQ",
-      "failed": "Failed, retrying",
-      "alerts": "Unresolved alerts",
-      "incidents": "Open incidents"
-    },
-    "inFlight": {
-      "title": "In flight",
-      "desc": "Deliveries still walking the retry ladder",
-      "empty": "Nothing in flight",
-      "rail": "Attempt {{count}} of {{total}}",
-      "status": {
-        "PENDING": "Pending",
-        "PROCESSING": "Attempting",
-        "SUCCESS": "Delivered",
-        "FAILED": "Failed",
-        "DLQ": "Abandoned"
-      }
+      "idleDetail": "Send your first event and this fills in.",
+      "label": "Success rate",
+      "ok": "Everything is landing",
+      "retry": "Some deliveries need attention"
     }
   },
   "debugLinks": {
@@ -1049,7 +1067,19 @@
     "noDeliveriesForEventPlain": "Event type {{eventType}} matched no active subscription. A delivery is only created when an event type matches at least one subscription.",
     "nothingToReplay": "This delivery cannot be replayed",
     "projectNotFound": "Project not found",
+    "rail": {
+      "label": "{{count}} of {{total}} attempts used",
+      "next": "next {{time}}"
+    },
     "replayError": "Please select a status filter (FAILED or DLQ) before bulk replay",
+    "replayMatching": "Replay all matching ({{count}})",
+    "replaySelected": "Replay selected ({{count}})",
+    "replayedCount": "{{count}} deliveries queued for replay",
+    "replayedCount_few": "{{count}} deliveries queued for replay",
+    "replayedCount_many": "{{count}} deliveries queued for replay",
+    "replayedCount_one": "{{count}} delivery queued for replay",
+    "replayedCount_other": "{{count}} deliveries queued for replay",
+    "replayedSomeSkipped": "Queued {{replayed}} for replay, skipped {{skipped}} that were not replayable",
     "replaying": "Replaying...",
     "status": {
       "DLQ": "DLQ",
@@ -1072,23 +1102,18 @@
       "loadFailed": "Failed to load deliveries",
       "replayFailed": "Failed to replay delivery"
     },
-    "viewSubscriptions": "View Subscriptions",
-    "rail": {
-      "label": "{{count}} of {{total}} attempts used",
-      "next": "next {{time}}"
-    },
-    "replayMatching": "Replay all matching ({{count}})",
-    "replaySelected": "Replay selected ({{count}})",
-    "replayedCount": "{{count}} deliveries queued for replay",
-    "replayedCount_one": "{{count}} delivery queued for replay",
-    "replayedCount_few": "{{count}} deliveries queued for replay",
-    "replayedCount_many": "{{count}} deliveries queued for replay",
-    "replayedCount_other": "{{count}} deliveries queued for replay",
-    "replayedSomeSkipped": "Queued {{replayed}} for replay, skipped {{skipped}} that were not replayable"
+    "viewSubscriptions": "View Subscriptions"
   },
   "deliveryDetails": {
     "attemptNumber": "Attempt #{{number}}",
     "attempts": "Attempts",
+    "compare": {
+      "clear": "Clear comparison",
+      "duration": "Duration",
+      "error": "Error",
+      "httpStatus": "HTTP status",
+      "versus": "{{left}} vs {{right}}"
+    },
     "compareAttempts": "Compare Attempts",
     "compareHint": "Click two attempts to compare status, latency, errors, and response bodies",
     "copyValue": "Copy value",
@@ -1170,13 +1195,6 @@
       "tip4": "Inspect the error messages in delivery attempts below",
       "tip5": "Consider replaying the delivery after fixing the issue",
       "title": "Troubleshooting Tips"
-    },
-    "compare": {
-      "clear": "Clear comparison",
-      "duration": "Duration",
-      "error": "Error",
-      "httpStatus": "HTTP status",
-      "versus": "{{left}} vs {{right}}"
     }
   },
   "dlq": {
@@ -1343,6 +1361,79 @@
       "subscription": "Subscription",
       "subscriptionDesc": "A standing statement that one endpoint wants events of a given type."
     },
+    "configuration": {
+      "addresses": {
+        "appBaseUrl": "Where your users' browsers reach the dashboard. It is what goes into verification emails, password resets and shared debug links — left on localhost, those links are unusable for everyone but you.",
+        "cors": "Origins allowed to call the API from a browser. Comma-separated.",
+        "hookflowBind": "Which host interface that port is published on. Installing with a domain moves it to `127.0.0.1` and puts the TLS terminator in front.",
+        "hookflowDomain": "The domain the built-in TLS terminator obtains a certificate for. It only runs under the `tls` Compose profile, which `install.sh --domain` turns on.",
+        "hookflowPort": "The one port published to the host. nginx serves the dashboard on it and proxies every API path, so it is the single URL to hand out and the single thing to put a certificate on.",
+        "ingressBase": "The prefix of the ingress URL shown for each incoming source. It is the URL you paste into Stripe or GitHub, so it has to be the address they can reach, not yours.",
+        "tunnelBase": "The same, for the public URL a CLI tunnel prints.",
+        "viteApiUrl": "The API origin the dashboard calls. Baked in at image build time, not read at runtime."
+      },
+      "addressesDesc": "Every port is a variable — nothing is hard-coded. The two that catch people out are the management port, which is not the API, and the base URLs, which end up inside links your users receive.",
+      "addressesTitle": "Ports and addresses",
+      "authorityDesc": "`.env.dist` is the authority and carries every variable with a comment explaining it — around two hundred, most of them a timeout or a batch size that is right until a load test says otherwise. This page covers the other kind: the ones whose default is a development choice that becomes wrong the moment the instance is reachable from outside your machine.",
+      "authorityLabel": "The full list",
+      "defaultIs": "Default `{{value}}`.",
+      "delivery": {
+        "allowedHosts": "An allowlist of hosts endpoints may point at. Empty means any public host.",
+        "concurrentPerEndpoint": "In-flight attempts against a single endpoint. It is a courtesy to the receiver as much as a limit on you.",
+        "fanout": "Most deliveries one event may create. An event matching more subscriptions than this is rejected rather than half-delivered.",
+        "gapTimeout": "How long an ordered delivery waits for the one before it. After this it goes anyway — a predecessor that never arrives delays one delivery rather than stopping the endpoint.",
+        "payloadSize": "Largest event body accepted, in bytes.",
+        "privateIps": "Off by default: an endpoint URL resolving to a loopback, link-local or private address is refused, and so are the cloud metadata endpoints. Turn it on only for an instance that delivers exclusively inside your own network.",
+        "projectRate": "Events per second one project may send.",
+        "verificationRequired": "When on, a new endpoint has to answer a challenge before anything is delivered to it."
+      },
+      "deliveryDesc": "The bounds a single project can push the platform to. On a cloud deployment the plan's limits apply on top of these; self-hosted, these are the only ones.",
+      "deliveryTitle": "Delivery limits",
+      "housekeeping": {
+        "attemptsDays": "How long delivery attempts are kept before the nightly cleanup removes them.",
+        "billingEnabled": "Off means no plans and no quotas — the self-hosted default. On, the seeded plans apply and the limits below stop being consulted.",
+        "emailEnabled": "Off by default. With it off, verification, invite and reset links are written to the API log instead of sent — which is what makes a local instance usable without a mail server.",
+        "entitlementFanout": "The fan-out ceiling when billing is off.",
+        "entitlementRate": "The requests-per-second an organization gets when billing is off.",
+        "incomingDays": "The same, for incoming events.",
+        "logLevel": "`ERROR`, `WARN`, `INFO` or `DEBUG`.",
+        "metrics": "Exposes `/actuator/prometheus` on the management port.",
+        "smtp": "Your mail server, once `EMAIL_ENABLED=true`.",
+        "swagger": "Off by default. It publishes the whole API surface, which is a thing to decide about rather than leave on."
+      },
+      "housekeepingDesc": "What is kept, what gets sent, and what is exposed.",
+      "housekeepingTitle": "Retention, email and the rest",
+      "howDesc": "Everything is an environment variable. `docker compose` reads the `.env` file beside the compose file and passes what each service needs into its container; nothing is configured by editing a file inside an image. Change a value, then `docker compose up -d` — Compose recreates only the containers whose environment changed.",
+      "howTitle": "How settings reach the services",
+      "publicDesc": "Four values move together: `APP_BASE_URL` and `VITE_API_URL` for the browser, `WEBHOOK_INGRESS_BASE_URL` and `TUNNEL_INGRESS_BASE_URL` for the providers sending to you. Add the API origin to `CORS_ALLOWED_ORIGINS` and to `VITE_CSP_EXTRA_CONNECT` — the dashboard's Content-Security-Policy blocks any origin it does not name, so a working API and a blank dashboard is what a missed one looks like.",
+      "publicTitle": "Putting it behind a domain",
+      "required": {
+        "adminToken": "Presented in `X-Platform-Admin-Token` for the cluster-wide operator endpoints under `/api/v1/admin`, such as rotating the encryption key across every tenant. Deliberately separate from any organization: an org OWNER does not get it. Left empty those endpoints are unreachable, which is the right state until an operator needs them.",
+        "appEnv": "`development`, `staging` or `production`. Production turns on the startup checks below.",
+        "encKey": "Derives the AES-256-GCM key that endpoint secrets, HMAC secrets and mTLS material are encrypted with at rest. Lose it and none of them can be read back.",
+        "encSalt": "The PBKDF2 salt for that derivation. Unique per deployment; changing it has the same effect as changing the key.",
+        "jwtSecret": "Signs every access token. 32 characters or more; rotating it logs everyone out.",
+        "pgPassword": "The embedded Postgres password.",
+        "redisPassword": "The Redis password."
+      },
+      "requiredDesc": "The shipped values are placeholders. Every one of them is public — they are in `.env.dist` in a public repository — so an instance left on them is an instance anyone can sign tokens for and decrypt the endpoint secrets of.",
+      "requiredTitle": "Change before it is reachable",
+      "startupDesc": "With `APP_ENV=production` the services validate their own configuration before accepting traffic and abort on a placeholder secret, a secret shorter than its minimum, or a combination that would leave the instance open. It is a startup failure rather than a warning on purpose: a warning in a log nobody reads is how an instance ends up in production on `dev_jwt_secret_key_32_chars_minimum`.",
+      "startupLabel": "What production mode refuses to start on",
+      "stores": {
+        "concurrency": "Concurrent consumers per worker instance. Total in-flight deliveries is this times the number of workers, capped by the partition count.",
+        "dbExternal": "Your managed Postgres, used when `DB_MODE=external`.",
+        "dbMode": "`embedded` runs Postgres in Compose; `external` uses the `DB_*` settings below instead.",
+        "dbSsl": "Set it to `require` for anything not on the same private network.",
+        "kafka": "Comma-separated broker list.",
+        "partitions": "Partitions on the delivery topics, which is the ceiling on how many workers can consume in parallel. Raise it before you scale workers past it; it cannot be lowered afterwards.",
+        "redis": "Where Redis lives."
+      },
+      "storesDesc": "Compose runs all three for you. Point them at managed instances when you would rather not operate them: Postgres holds the record, Kafka moves the work, Redis holds the claims, rate limits and the ordering buffer.",
+      "storesTitle": "Postgres, Redis and Kafka",
+      "subtitle": "The settings a self-hosted instance has to make a decision about, and where each one is set.",
+      "title": "Configuration"
+    },
     "deterministicReplay": {
       "diagAlt": "Two lanes. In the retry lane, one delivery loops back to itself for its next attempt, keeping its id and sequence number. In the replay lane, an event produces a second delivery with a new id and a new sequence number, while the original delivery is left unchanged.",
       "diagCaption": "A retry moves a row you already have. A replay writes a row you did not, and gives it a new position in the endpoint’s sequence.",
@@ -1402,6 +1493,10 @@
     "gettingStarted": {
       "nextDesc": "The Test Console sends an event and shows every attempt as it happens. Webhook Security covers verifying the signature; Retries covers what happens while your endpoint is down.",
       "nextLabel": "Next",
+      "portActuator": "Health and Prometheus metrics, inside the network only. It sits on its own port so a broken auth configuration cannot take health checks down with it; nginx proxies the health paths from it and refuses the rest.",
+      "portApi": "The API, inside the Docker network only. Reached through the port above; not published, so nothing outside the network can talk to it directly.",
+      "portWeb": "Everything: the dashboard, the API, the docs, the ingress endpoints. The only port bound to the host — nginx serves the dashboard and proxies the rest. Change it with",
+      "portsTitle": "The port it binds, and the two it does not",
       "runBaseUrlDesc": "Every sample below points at https://your-api.com — replace it with wherever you put the instance. The health and Prometheus endpoints deliberately sit outside the authenticated chain, on their own port, so a broken auth configuration cannot take your health checks down with it.",
       "runBaseUrlLabel": "The base URL",
       "runDesc": "Everything below runs against an instance you host. One command installs it: the installer checks the machine, generates your secrets and starts the stack, and everything is served on a single port.",
@@ -1423,11 +1518,7 @@
       "subtitle": "From no instance to a delivered event.",
       "title": "Getting Started",
       "verifyDesc": "A delivery to an endpoint that is neither `VERIFIED` nor `SKIPPED` fails terminally, without a single retry. `POST /api/v1/projects/{projectId}/endpoints/{id}/verify` sends the challenge; Webhook Security has the format of it.",
-      "verifyLabel": "It receives nothing until it is verified",
-      "portsTitle": "The port it binds, and the two it does not",
-      "portWeb": "Everything: the dashboard, the API, the docs, the ingress endpoints. The only port bound to the host — nginx serves the dashboard and proxies the rest. Change it with",
-      "portApi": "The API, inside the Docker network only. Reached through the port above; not published, so nothing outside the network can talk to it directly.",
-      "portActuator": "Health and Prometheus metrics, inside the network only. It sits on its own port so a broken auth configuration cannot take health checks down with it; nginx proxies the health paths from it and refuses the rest."
+      "verifyLabel": "It receives nothing until it is verified"
     },
     "incomingWebhooks": {
       "dedupDesc": "Providers resend. When the request carries an id Hookflow recognises — `X-Webhook-Id`, Stripe-Webhook-Id, `X-GitHub-Delivery`, `X-Shopify-Webhook-Id`, `X-Twilio-Webhook-Id`, or Slack's event_id — a second arrival of the same id returns the stored event instead of forwarding it again. A provider that sends none of these is not deduplicated.",
@@ -1459,15 +1550,20 @@
     "overview": {
       "coreConcepts": "Core concepts",
       "diagDirAlt": "Two rows sharing one layout. Outgoing: your system announces order.created, Hookflow delivers it to an endpoint and writes the X-Signature header on the way out, and the attempt rail under the row shows seven rungs. Incoming: a provider posts to Hookflow, which reads the provider's own Stripe-Signature header on the way in and forwards to a destination, with five rungs on its rail.",
+      "diagDirAttemptsIn": "5 tries",
+      "diagDirAttemptsOut": "7 tries",
       "diagDirCaption": "The same platform in the middle both times, and the same attempt rail underneath. What changes is which side of Hookflow the proof sits on: it writes the signature on the way out and reads the provider's on the way in.",
       "diagDirProvider": "A provider",
       "diagDirShared": "one attempt lifecycle, both directions",
       "diagDirSigns": "signs",
       "diagDirVerifies": "verifies",
       "diagDirYourSystem": "Your system",
+      "diagFanAbandoned": "Failed Messages",
       "diagFanAlt": "An order.created event at the top, with three arrows fanning out to three deliveries — one per subscribed endpoint. The first is delivered on attempt 1 of 7, the second is retrying on attempt 3 of 7, and the third has used all 7 and sits in Failed Messages.",
       "diagFanCaption": "One event, three deliveries, three attempt counts at the same moment. A delivery that runs out of attempts is abandoned to Failed Messages on its own — nothing about it reaches the two that are still going.",
+      "diagFanDelivered": "delivered",
       "diagFanEach": "each delivery walks its own ladder",
+      "diagFanRetrying": "retrying",
       "directions": "The two directions",
       "eventFlow": "What happens to an event",
       "flow1": "Announced",
@@ -1487,12 +1583,7 @@
       "title": "Documentation",
       "whatIs": "What it does",
       "whatIsDesc1": "Hookflow sends your events to the endpoints your customers registered, and takes webhooks in from other services to forward where you choose.",
-      "whatIsDesc2": "Both directions share one attempt log, one retry ladder and one set of screens.",
-      "diagFanDelivered": "delivered",
-      "diagFanRetrying": "retrying",
-      "diagFanAbandoned": "Failed Messages",
-      "diagDirAttemptsOut": "7 tries",
-      "diagDirAttemptsIn": "5 tries"
+      "whatIsDesc2": "Both directions share one attempt log, one retry ladder and one set of screens."
     },
     "paramTable": {
       "description": "Description",
@@ -1506,6 +1597,7 @@
       "canonicalLink": "Browse the hosted reference",
       "deprecated": "Deprecated",
       "groupsLabel": "Operation groups",
+      "hideFields": "Hide field reference",
       "lede": "Every operation the API serves, generated from openapi.yaml — so it says what the running server actually does.",
       "loadError": "The API reference could not be loaded. Reload the page — the index ships with the app, so this is usually a stale cached build.",
       "noMatches": "No operation matches this search. Try a path fragment such as /events, or a method such as POST.",
@@ -1516,11 +1608,10 @@
       "searchLabel": "Search operations",
       "searchPlaceholder": "Path, summary, operation ID or method…",
       "searchResults": "Search results · {{n}}",
+      "showFields": "Field reference for {{type}}",
       "sourceOfTruth": "Source of truth",
       "specLink": "Download openapi.yaml",
-      "title": "API reference",
-      "showFields": "Field reference for {{type}}",
-      "hideFields": "Hide field reference"
+      "title": "API reference"
     },
     "response": "Response",
     "retries": {
@@ -1585,6 +1676,7 @@
       "diagRules": "Rules",
       "diagStop": "stops here",
       "diagSubs": "Subscriptions matched",
+      "diagSubsSub": "one delivery per match",
       "exampleDesc": "Any order over 1000 in USD or EUR is sent to the fraud endpoint and tagged, on top of whatever its subscriptions already do.",
       "exampleTitle": "Example: route high-value orders",
       "howItWorks": "How a rule runs",
@@ -1599,8 +1691,7 @@
       "step4": "Actions run",
       "step4Desc": "Every action of a matching rule runs in its configured order.",
       "subtitle": "Match an event on its content, then route, transform, tag or drop it — before any delivery exists.",
-      "title": "Rules Engine",
-      "diagSubsSub": "one delivery per match"
+      "title": "Rules Engine"
     },
     "schemaRegistry": {
       "compatBackwardDesc": "The new schema can read data written by the old one. A new required property is refused; a new optional one is fine, and so is dropping a property.",
@@ -1610,8 +1701,11 @@
       "compatibilityModes": "Compatibility modes",
       "compatibilityModesDesc": "Set per version, and enforced: a version that breaks the promise is refused with 400 rather than stored. Omit it and the previous version's mode carries over. Changing a property's type is refused by all three checking modes.",
       "lifecycle": "Version lifecycle",
+      "lifecycleActiveDoes": "payloads checked",
       "lifecycleAlt": "Three states in a row: `DRAFT`, then `ACTIVE`, then `DEPRECATED`. Promoting a draft makes it the active version and moves the version it replaces to deprecated.",
       "lifecycleCaption": "Only one version is enforced at a time, and promoting the next one is what retires the current one.",
+      "lifecycleDeprecatedDoes": "kept, not enforced",
+      "lifecycleDraftDoes": "not enforced",
       "lifecycleOnlyOne": "one `ACTIVE` version per event type",
       "lifecyclePromote": "promote",
       "lifecycleReplaced": "replaced",
@@ -1633,10 +1727,7 @@
       "wildcardMultiDesc": "Any number of segments: order.created, order.line.added, order.a.b.c.",
       "wildcardRouting": "Event type patterns",
       "wildcardRoutingDesc": "What a subscription may point at, beyond one exact type:",
-      "wildcardSingleDesc": "One segment: order.created, order.updated. Not order.line.added.",
-      "lifecycleDraftDoes": "not enforced",
-      "lifecycleActiveDoes": "payloads checked",
-      "lifecycleDeprecatedDoes": "kept, not enforced"
+      "wildcardSingleDesc": "One segment: order.created, order.updated. Not order.line.added."
     },
     "sdks": {
       "deliveries": "Deliveries",
@@ -1657,6 +1748,7 @@
       "apiReference": "API Reference",
       "authentication": "Authentication",
       "cli": "CLI",
+      "configuration": "Configuration",
       "deterministicReplay": "Replay",
       "errors": "Errors & Limits",
       "gettingStarted": "Getting Started",
@@ -1667,8 +1759,7 @@
       "schemaRegistry": "Schema Registry",
       "sdks": "SDKs",
       "webhookSecurity": "Webhook Security",
-      "workflowAutomation": "Workflows",
-      "configuration": "Configuration"
+      "workflowAutomation": "Workflows"
     },
     "security": {
       "challengeRequest": "What Hookflow sends",
@@ -1697,22 +1788,22 @@
       "rotationDesc": "`POST /api/v1/projects/{projectId}/endpoints/{id}/rotate-secret` returns a new secret and keeps the old one working. For the endpoint's grace period — 24 hours by default — every delivery is signed with both, and the header carries one `v1` per valid secret:",
       "sigVerification": "Signature",
       "sigVerificationDesc": "`X-Signature` is `t=<unix-ms>,v1=<hex>`. `v1` is HMAC-SHA256 over the exact string `<t>.<raw body>`, keyed with the endpoint secret. `t` is milliseconds, not seconds. The header may carry more than one `v1` — see rotating a secret below — so treat the delivery as authentic when any of them matches.",
-      "subtitle": "What Hookflow puts on a request it sends, and how the receiver checks it.",
-      "title": "Webhook Security",
-      "verificationExamples": "Verifying it",
       "standard": "Standard Webhooks",
-      "standardDesc": "Every delivery also carries the Standard Webhooks headers — `webhook-id`, `webhook-timestamp` and `webhook-signature` — unless the endpoint is set to send only `X-Signature`. It is the convention OpenAI, Anthropic, Twilio, PagerDuty and Supabase send, so there is a verification library for it in most languages and you write no signing code of your own.",
-      "standardHeaders": "The three headers",
-      "standardHeaderId": "The delivery id — one event to one endpoint, unchanged across every attempt of it, and part of what is signed. Safe to deduplicate on.",
-      "standardHeaderTimestamp": "When this body was signed, in unix seconds — not the milliseconds `X-Timestamp` carries on the same request. Do not hand one to a verifier expecting the other.",
-      "standardHeaderSignature": "`v1,<base64>`. HMAC-SHA256 over `<webhook-id>.<webhook-timestamp>.<raw body>`, keyed with the endpoint’s `whsec_…` secret. Space-separated, one entry per valid secret while a rotated secret is inside its grace window — so treat the delivery as authentic when any of them matches.",
       "standardChoosing": "Which one to verify",
       "standardChoosingDesc": "Either, and you can change your mind. An endpoint is sent both header sets by default, and a receiver ignores the headers it does not read, so the choice costs nothing to defer and nothing to revisit — verify `X-Signature` today, move to the Standard Webhooks headers when it suits you, and no deploy of yours has to line up with one of ours.",
       "standardChoosingWhere": "Reach for the Standard Webhooks headers when you would rather add a dependency than write signing code, or when you already verify another provider the same way. Reach for `X-Signature` when you have working verification code for it. Narrow an endpoint to one set only once nothing is reading the other — on the Connections tab, beside that endpoint’s signing secret.",
+      "standardDesc": "Every delivery also carries the Standard Webhooks headers — `webhook-id`, `webhook-timestamp` and `webhook-signature` — unless the endpoint is set to send only `X-Signature`. It is the convention OpenAI, Anthropic, Twilio, PagerDuty and Supabase send, so there is a verification library for it in most languages and you write no signing code of your own.",
+      "standardHeaderId": "The delivery id — one event to one endpoint, unchanged across every attempt of it, and part of what is signed. Safe to deduplicate on.",
+      "standardHeaderSignature": "`v1,<base64>`. HMAC-SHA256 over `<webhook-id>.<webhook-timestamp>.<raw body>`, keyed with the endpoint’s `whsec_…` secret. Space-separated, one entry per valid secret while a rotated secret is inside its grace window — so treat the delivery as authentic when any of them matches.",
+      "standardHeaderTimestamp": "When this body was signed, in unix seconds — not the milliseconds `X-Timestamp` carries on the same request. Do not hand one to a verifier expecting the other.",
+      "standardHeaders": "The three headers",
+      "standardPitfallsDesc": "Sign the raw bytes, as with `X-Signature`. Then the three that belong to this scheme alone: the timestamp is seconds, so a milliseconds comparison rejects everything; the digest is base64, not hex; and `webhook-id` is part of the signed string, so leaving it out produces a digest that never matches and never says why. Read every space-separated entry in `webhook-signature` rather than the first, or a rotation looks like a forged request.",
+      "standardPitfallsLabel": "Common mistakes",
       "standardSecret": "Which secret",
       "standardSecretDesc": "Not the same string. `X-Signature` is keyed with the endpoint secret as it is; the Standard Webhooks headers are keyed with that same secret in the conventional `whsec_<base64>` form. The API returns it as `standardWebhooksSecret` whenever it returns the secret itself — at creation and at rotation — and the dashboard shows it beside the other. The official SDKs accept a raw secret too and use it as-is, so handing over the wrong form fails as an invalid signature rather than as an error that says which one you meant.",
-      "standardPitfallsLabel": "Common mistakes",
-      "standardPitfallsDesc": "Sign the raw bytes, as with `X-Signature`. Then the three that belong to this scheme alone: the timestamp is seconds, so a milliseconds comparison rejects everything; the digest is base64, not hex; and `webhook-id` is part of the signed string, so leaving it out produces a digest that never matches and never says why. Read every space-separated entry in `webhook-signature` rather than the first, or a rotation looks like a forged request."
+      "subtitle": "What Hookflow puts on a request it sends, and how the receiver checks it.",
+      "title": "Webhook Security",
+      "verificationExamples": "Verifying it"
     },
     "sidebar": {
       "apiDocs": "API Documentation",
@@ -1753,79 +1844,6 @@
       "triggerSchedule": "Runs on a schedule, with no event behind it.",
       "triggerTypes": "Trigger types",
       "triggerWebhookEvent": "Runs whenever an event of the chosen type is announced in the project."
-    },
-    "configuration": {
-      "title": "Configuration",
-      "subtitle": "The settings a self-hosted instance has to make a decision about, and where each one is set.",
-      "defaultIs": "Default `{{value}}`.",
-      "howTitle": "How settings reach the services",
-      "howDesc": "Everything is an environment variable. `docker compose` reads the `.env` file beside the compose file and passes what each service needs into its container; nothing is configured by editing a file inside an image. Change a value, then `docker compose up -d` — Compose recreates only the containers whose environment changed.",
-      "authorityLabel": "The full list",
-      "authorityDesc": "`.env.dist` is the authority and carries every variable with a comment explaining it — around two hundred, most of them a timeout or a batch size that is right until a load test says otherwise. This page covers the other kind: the ones whose default is a development choice that becomes wrong the moment the instance is reachable from outside your machine.",
-      "requiredTitle": "Change before it is reachable",
-      "requiredDesc": "The shipped values are placeholders. Every one of them is public — they are in `.env.dist` in a public repository — so an instance left on them is an instance anyone can sign tokens for and decrypt the endpoint secrets of.",
-      "required": {
-        "appEnv": "`development`, `staging` or `production`. Production turns on the startup checks below.",
-        "jwtSecret": "Signs every access token. 32 characters or more; rotating it logs everyone out.",
-        "encKey": "Derives the AES-256-GCM key that endpoint secrets, HMAC secrets and mTLS material are encrypted with at rest. Lose it and none of them can be read back.",
-        "encSalt": "The PBKDF2 salt for that derivation. Unique per deployment; changing it has the same effect as changing the key.",
-        "pgPassword": "The embedded Postgres password.",
-        "redisPassword": "The Redis password.",
-        "adminToken": "Presented in `X-Platform-Admin-Token` for the cluster-wide operator endpoints under `/api/v1/admin`, such as rotating the encryption key across every tenant. Deliberately separate from any organization: an org OWNER does not get it. Left empty those endpoints are unreachable, which is the right state until an operator needs them."
-      },
-      "startupLabel": "What production mode refuses to start on",
-      "startupDesc": "With `APP_ENV=production` the services validate their own configuration before accepting traffic and abort on a placeholder secret, a secret shorter than its minimum, or a combination that would leave the instance open. It is a startup failure rather than a warning on purpose: a warning in a log nobody reads is how an instance ends up in production on `dev_jwt_secret_key_32_chars_minimum`.",
-      "addressesTitle": "Ports and addresses",
-      "addressesDesc": "Every port is a variable — nothing is hard-coded. The two that catch people out are the management port, which is not the API, and the base URLs, which end up inside links your users receive.",
-      "addresses": {
-        "hookflowPort": "The one port published to the host. nginx serves the dashboard on it and proxies every API path, so it is the single URL to hand out and the single thing to put a certificate on.",
-        "hookflowBind": "Which host interface that port is published on. Installing with a domain moves it to `127.0.0.1` and puts the TLS terminator in front.",
-        "hookflowDomain": "The domain the built-in TLS terminator obtains a certificate for. It only runs under the `tls` Compose profile, which `install.sh --domain` turns on.",
-        "appBaseUrl": "Where your users' browsers reach the dashboard. It is what goes into verification emails, password resets and shared debug links — left on localhost, those links are unusable for everyone but you.",
-        "viteApiUrl": "The API origin the dashboard calls. Baked in at image build time, not read at runtime.",
-        "cors": "Origins allowed to call the API from a browser. Comma-separated.",
-        "ingressBase": "The prefix of the ingress URL shown for each incoming source. It is the URL you paste into Stripe or GitHub, so it has to be the address they can reach, not yours.",
-        "tunnelBase": "The same, for the public URL a CLI tunnel prints."
-      },
-      "publicTitle": "Putting it behind a domain",
-      "publicDesc": "Four values move together: `APP_BASE_URL` and `VITE_API_URL` for the browser, `WEBHOOK_INGRESS_BASE_URL` and `TUNNEL_INGRESS_BASE_URL` for the providers sending to you. Add the API origin to `CORS_ALLOWED_ORIGINS` and to `VITE_CSP_EXTRA_CONNECT` — the dashboard's Content-Security-Policy blocks any origin it does not name, so a working API and a blank dashboard is what a missed one looks like.",
-      "storesTitle": "Postgres, Redis and Kafka",
-      "storesDesc": "Compose runs all three for you. Point them at managed instances when you would rather not operate them: Postgres holds the record, Kafka moves the work, Redis holds the claims, rate limits and the ordering buffer.",
-      "stores": {
-        "dbMode": "`embedded` runs Postgres in Compose; `external` uses the `DB_*` settings below instead.",
-        "dbExternal": "Your managed Postgres, used when `DB_MODE=external`.",
-        "dbSsl": "Set it to `require` for anything not on the same private network.",
-        "redis": "Where Redis lives.",
-        "kafka": "Comma-separated broker list.",
-        "partitions": "Partitions on the delivery topics, which is the ceiling on how many workers can consume in parallel. Raise it before you scale workers past it; it cannot be lowered afterwards.",
-        "concurrency": "Concurrent consumers per worker instance. Total in-flight deliveries is this times the number of workers, capped by the partition count."
-      },
-      "deliveryTitle": "Delivery limits",
-      "deliveryDesc": "The bounds a single project can push the platform to. On a cloud deployment the plan's limits apply on top of these; self-hosted, these are the only ones.",
-      "delivery": {
-        "payloadSize": "Largest event body accepted, in bytes.",
-        "fanout": "Most deliveries one event may create. An event matching more subscriptions than this is rejected rather than half-delivered.",
-        "projectRate": "Events per second one project may send.",
-        "concurrentPerEndpoint": "In-flight attempts against a single endpoint. It is a courtesy to the receiver as much as a limit on you.",
-        "privateIps": "Off by default: an endpoint URL resolving to a loopback, link-local or private address is refused, and so are the cloud metadata endpoints. Turn it on only for an instance that delivers exclusively inside your own network.",
-        "allowedHosts": "An allowlist of hosts endpoints may point at. Empty means any public host.",
-        "verificationRequired": "When on, a new endpoint has to answer a challenge before anything is delivered to it.",
-        "gapTimeout": "How long an ordered delivery waits for the one before it. After this it goes anyway — a predecessor that never arrives delays one delivery rather than stopping the endpoint."
-      },
-      "housekeepingTitle": "Retention, email and the rest",
-      "housekeepingDesc": "What is kept, what gets sent, and what is exposed.",
-      "housekeeping": {
-        "attemptsDays": "How long delivery attempts are kept before the nightly cleanup removes them.",
-        "incomingDays": "The same, for incoming events.",
-        "emailEnabled": "Off by default. With it off, verification, invite and reset links are written to the API log instead of sent — which is what makes a local instance usable without a mail server.",
-        "smtp": "Your mail server, once `EMAIL_ENABLED=true`.",
-        "billingEnabled": "Off means no plans and no quotas — the self-hosted default. On, the seeded plans apply and the limits below stop being consulted.",
-        "entitlementRate": "The requests-per-second an organization gets when billing is off.",
-        "entitlementFanout": "The fan-out ceiling when billing is off.",
-        "logLevel": "`ERROR`, `WARN`, `INFO` or `DEBUG`.",
-        "metrics": "Exposes `/actuator/prometheus` on the management port.",
-        "swagger": "Off by default. It publishes the whole API surface, which is a thing to decide about rather than leave on."
-      }
     }
   },
   "endpoints": {
@@ -2037,6 +2055,11 @@
     "compare": "Compare",
     "compareHint": "Both events keep their stored payloads — comparing changes nothing.",
     "comparing": "Comparing events...",
+    "diffType": {
+      "ADDED": "Added",
+      "CHANGED": "Changed",
+      "REMOVED": "Removed"
+    },
     "differencesDetected": "{{count}} difference(s) detected",
     "emptyDescription": "Select two events above to compare their payloads side by side. Structural differences like added, removed, or changed fields will be highlighted automatically.",
     "emptyTitle": "Compare Event Payloads",
@@ -2066,17 +2089,18 @@
     "toast": {
       "diffFailed": "Failed to compute diff",
       "loadEventsFailed": "Failed to load events"
-    },
-    "diffType": {
-      "ADDED": "Added",
-      "REMOVED": "Removed",
-      "CHANGED": "Changed"
     }
   },
   "events": {
     "created": "Created",
     "deliveredOf": "{{delivered}} of {{total}} delivered",
     "deliveriesCount": "Deliveries",
+    "deliveryStatus": {
+      "abandoned": "Abandoned",
+      "delivered": "Delivered",
+      "owed": "Still owed",
+      "unsubscribed": "No subscriber"
+    },
     "details": {
       "deliveries": "Deliveries",
       "noDeliveries": "No deliveries for this event",
@@ -2093,8 +2117,17 @@
     },
     "eventId": "Event ID",
     "eventType": "Event Type",
+    "filters": {
+      "allStatuses": "All statuses",
+      "clientSideNote": "Showing {{shown}} of the {{count}} events on this page. The filter applies to what is loaded, not to the whole project.",
+      "deliveryStatus": "Delivery status",
+      "eventType": "Event type",
+      "eventTypePlaceholder": "e.g. order.created"
+    },
     "noEvents": "No events yet",
     "noEventsDesc": "Send your first webhook event to start processing deliveries",
+    "noMatchDesc": "No event type matches this search. Try a shorter prefix, such as order.",
+    "outgoingTitle": "Outgoing events",
     "sendModal": {
       "description": "Send a webhook event to trigger deliveries to subscribed endpoints",
       "eventType": "Event Type",
@@ -2104,10 +2137,10 @@
       "matchInfo": "{{count}} subscription(s) will receive this event.",
       "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
       "noteBody": "This event will create deliveries for all active subscriptions matching this event type. Check the Deliveries page to see processing results.",
-      "schemaWarnings": "Accepted, but the payload does not match the active schema ({{count}}): {{errors}}",
       "noteLabel": "Note:",
       "payload": "Event Payload (JSON)",
       "payloadHint": "Must be valid JSON. This data will be sent to webhook endpoints.",
+      "schemaWarnings": "Accepted, but the payload does not match the active schema ({{count}}): {{errors}}",
       "send": "Send Event",
       "sending": "Sending...",
       "sentSuccess": "Event sent successfully! Created {{count}} deliveries.",
@@ -2122,22 +2155,7 @@
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
       "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
     },
-    "viewDeliveries": "View deliveries for this event",
-    "filters": {
-      "allStatuses": "All statuses",
-      "clientSideNote": "Showing {{shown}} of the {{count}} events on this page. The filter applies to what is loaded, not to the whole project.",
-      "deliveryStatus": "Delivery status",
-      "eventType": "Event type",
-      "eventTypePlaceholder": "e.g. order.created"
-    },
-    "noMatchDesc": "No event type matches this search. Try a shorter prefix, such as order.",
-    "outgoingTitle": "Outgoing events",
-    "deliveryStatus": {
-      "delivered": "Delivered",
-      "owed": "Still owed",
-      "abandoned": "Abandoned",
-      "unsubscribed": "No subscriber"
-    }
+    "viewDeliveries": "View deliveries for this event"
   },
   "footer": {
     "access": "Access",
@@ -2169,59 +2187,59 @@
     },
     "empty": "No incidents",
     "emptyDesc": "Incidents group related failures for tracking and RCA",
+    "filterLabel": "Which incidents",
     "form": {
       "severity": "Severity",
       "title": "Title",
       "titlePlaceholder": "Payment endpoint returning 503"
     },
     "investigate": "Investigate",
+    "investigateDeliveries": "Investigate deliveries",
+    "loadFailed": "Couldn't load incidents for this project",
     "noOpen": "No open incidents",
     "noteDialog": {
       "detail": "Detail (optional)",
+      "detailPlaceholder": "What you found, and what you did",
       "noteTitle": "Title",
       "submit": "Add Note",
       "title": "Add Timeline Note",
-      "titlePlaceholder": "Contacted vendor support",
-      "detailPlaceholder": "What you found, and what you did"
+      "titlePlaceholder": "Contacted vendor support"
     },
     "openCount": "{{count}} open incidents",
     "openOnly": "Open Only",
+    "pageOf": "{{page}} / {{total}}",
     "rcaNotes": "Root Cause Analysis",
     "rcaPlaceholder": "Document the root cause, impact, and remediation steps...",
     "reopen": "Reopen",
     "resolve": "Resolve",
     "resolvedAt": "Resolved",
+    "resolvedAtLabel": "Resolved {{time}}",
     "showAll": "Show All",
+    "statuses": {
+      "INVESTIGATING": "Investigating",
+      "OPEN": "Open",
+      "RESOLVED": "Resolved"
+    },
+    "subtitle": "Group related failures, track what was done, and write down why.",
+    "tiles": {
+      "allClear": "All clear",
+      "critical": "Critical",
+      "criticalHint": "Unresolved and marked critical",
+      "investigating": "Investigating",
+      "investigatingHint": "Someone is on it",
+      "open": "Open",
+      "openHint": "Nobody has claimed these yet"
+    },
     "timeline": "Timeline",
     "title": "Incidents",
     "toast": {
+      "addNoteFailed": "Couldn't add the note",
+      "createFailed": "Couldn't create the incident",
       "created": "Incident created",
       "noteAdded": "Note added",
       "rcaSaved": "RCA notes saved",
       "statusUpdated": "Status updated",
-      "updateFailed": "Failed to update incident",
-      "createFailed": "Couldn't create the incident",
-      "addNoteFailed": "Couldn't add the note"
-    },
-    "subtitle": "Group related failures, track what was done, and write down why.",
-    "loadFailed": "Couldn't load incidents for this project",
-    "filterLabel": "Which incidents",
-    "pageOf": "{{page}} / {{total}}",
-    "investigateDeliveries": "Investigate deliveries",
-    "resolvedAtLabel": "Resolved {{time}}",
-    "statuses": {
-      "OPEN": "Open",
-      "INVESTIGATING": "Investigating",
-      "RESOLVED": "Resolved"
-    },
-    "tiles": {
-      "open": "Open",
-      "openHint": "Nobody has claimed these yet",
-      "allClear": "All clear",
-      "investigating": "Investigating",
-      "investigatingHint": "Someone is on it",
-      "critical": "Critical",
-      "criticalHint": "Unresolved and marked critical"
+      "updateFailed": "Failed to update incident"
     }
   },
   "incomingDestinations": {
@@ -2444,14 +2462,14 @@
       "name": "Source Name",
       "namePlaceholder": "GitHub Webhooks",
       "provider": "Provider Type",
+      "providerVerifiedHint": "Signature verification is built in for these. For any other provider choose HMAC (generic) and name the header it signs in.",
       "rateLimit": "Rate Limit (req/s)",
       "rateLimitPlaceholder": "100",
       "slug": "Slug (optional)",
       "slugHint": "URL-friendly identifier. Auto-generated from name if empty.",
       "slugPlaceholder": "github-webhooks",
       "title": "Create Incoming Source",
-      "verificationMode": "Verification Mode",
-      "providerVerifiedHint": "Signature verification is built in for these. For any other provider choose HMAC (generic) and name the header it signs in."
+      "verificationMode": "Verification Mode"
     },
     "created": "Created",
     "deleteDialog": {
@@ -2751,6 +2769,16 @@
       "ssrfTitle": "SSRF protection",
       "title": "Your customers' payloads, handled like they matter"
     },
+    "sentHeaders": {
+      "deliveryId": "this delivery",
+      "eventId": "the event",
+      "idempotency": "stable across attempts",
+      "label": "HEADERS WE SEND",
+      "note": "Signed with a secret only that endpoint has. Rotate it and the old one keeps verifying for 24 hours, so your customer deploys the new one when it suits them.",
+      "sequence": "its place in order",
+      "signature": "t=<ms>,v1=<hex>",
+      "timestamp": "when it was signed"
+    },
     "start": {
       "body": "Create an account, register the endpoint you want to reach, and send the event. The attempt shows up in the dashboard before you have switched tabs.",
       "docsLink": "Full quickstart",
@@ -2783,16 +2811,6 @@
       "stripeDetail": "timestamp + v1 signature",
       "twilioDetail": "URL + sorted params, SHA1",
       "verifiedLabel": "VERIFIED SOURCES"
-    },
-    "sentHeaders": {
-      "label": "HEADERS WE SEND",
-      "signature": "t=<ms>,v1=<hex>",
-      "eventId": "the event",
-      "deliveryId": "this delivery",
-      "timestamp": "when it was signed",
-      "sequence": "its place in order",
-      "idempotency": "stable across attempts",
-      "note": "Signed with a secret only that endpoint has. Rotate it and the old one keeps verifying for 24 hours, so your customer deploys the new one when it suits them."
     }
   },
   "members": {
@@ -2820,6 +2838,12 @@
     },
     "changeRoleFor": "Change the role of {{email}}",
     "email": "Email",
+    "invite": {
+      "emailDisabled": "Email delivery is not configured on this deployment, so nothing was sent to {{email}}. Pass on the link below yourself.",
+      "emailed": "The invitation was emailed to {{email}}. You can also pass on the link below."
+    },
+    "inviteExpired": "Invite expired — re-issue it",
+    "inviteExpires": "Invite expires {{when}}",
     "joined": "Joined",
     "noMembers": "No members yet",
     "noMembersDesc": "You are the only member of this organization",
@@ -2830,6 +2854,12 @@
     },
     "reinstateMember": "Reinstate {{email}}",
     "reinstating": "Reinstating...",
+    "reissueDialog": {
+      "description": "The previous link has stopped working. This one is valid for the next 48 hours.",
+      "title": "New invite link"
+    },
+    "reissueInvite": "Re-issue invite",
+    "reissueInviteFor": "Re-issue the invite for {{email}}",
     "remove": "Remove",
     "removeDialog": {
       "description": "This member will lose access to the organization and all its resources. This action cannot be undone.",
@@ -2840,6 +2870,12 @@
     },
     "removeFrom": "Remove {{email}}",
     "removing": "Removing...",
+    "revokeDialog": {
+      "description": "The link sent to {{email}} stops working and they will not be able to join. You can invite them again at any time.",
+      "title": "Revoke this invite?"
+    },
+    "revokeInvite": "Revoke invite",
+    "revokeInviteFor": "Revoke the invite for {{email}}",
     "role": "Role",
     "roles": {
       "DEVELOPER": "Developer",
@@ -2848,6 +2884,11 @@
     },
     "rolesHeading": "What each role grants",
     "status": "Status",
+    "statuses": {
+      "ACTIVE": "Active",
+      "DISABLED": "Suspended",
+      "INVITED": "Invited"
+    },
     "subtitle": "Manage access to this organization",
     "suspend": "Suspend",
     "suspendDialog": {
@@ -2873,29 +2914,25 @@
       "suspendFailed": "Failed to suspend member",
       "suspended": "Member suspended"
     },
-    "you": "You",
-    "statuses": {
-      "INVITED": "Invited",
-      "ACTIVE": "Active",
-      "DISABLED": "Suspended"
+    "you": "You"
+  },
+  "meta": {
+    "contact": {
+      "description": "Talk to us about Enterprise plans, volume pricing or self-hosted support.",
+      "title": "Contact — Hookflow"
     },
-    "invite": {
-      "emailDisabled": "Email delivery is not configured on this deployment, so nothing was sent to {{email}}. Pass on the link below yourself.",
-      "emailed": "The invitation was emailed to {{email}}. You can also pass on the link below."
+    "docs": {
+      "description": "How to send events, receive webhooks, verify signatures, and read what happened — guides and the full API reference.",
+      "title": "Documentation — Hookflow",
+      "titleSection": "{{section}} — Hookflow docs"
     },
-    "inviteExpires": "Invite expires {{when}}",
-    "inviteExpired": "Invite expired — re-issue it",
-    "reissueInvite": "Re-issue invite",
-    "reissueInviteFor": "Re-issue the invite for {{email}}",
-    "revokeInvite": "Revoke invite",
-    "revokeInviteFor": "Revoke the invite for {{email}}",
-    "revokeDialog": {
-      "description": "The link sent to {{email}} stops working and they will not be able to join. You can invite them again at any time.",
-      "title": "Revoke this invite?"
+    "landing": {
+      "description": "Send webhooks to your customers' endpoints and receive them from Stripe, GitHub or Slack. HMAC-signed, retried on a ladder from 1 minute to 24 hours, with Failed Messages and replay. Free for 10,000 events a month, or self-host under MIT.",
+      "title": "Hookflow — Webhook infrastructure, both directions"
     },
-    "reissueDialog": {
-      "description": "The previous link has stopped working. This one is valid for the next 48 hours.",
-      "title": "New invite link"
+    "pricing": {
+      "description": "Free for 10,000 events a month. Starter $29, Pro $99, Enterprise on request — or run the MIT-licensed build yourself with no limits at all.",
+      "title": "Pricing — Hookflow"
     }
   },
   "mtls": {
@@ -3002,44 +3039,34 @@
     "title": "Page not found"
   },
   "onboarding": {
-    "allDone": "You're all set! Your webhook infrastructure is ready.",
-    "allDoneAction": "View quickstart guide",
-    "collapse": "Collapse checklist",
-    "collapsed": "{{completed}} of {{total}} completed",
+    "allDone": "You're all set — Hookflow is carrying your webhooks.",
+    "allDoneAction": "Read the quickstart",
     "dismiss": "Dismiss",
-    "done": "Done",
-    "expand": "Expand checklist",
-    "go": "Go",
+    "progress": "{{done}} of {{total}}",
+    "restore": "Getting started",
     "steps": {
-      "checkDelivery": "Verify delivery",
-      "checkDeliveryDesc": "Check the delivery log to confirm your webhook was received",
-      "createApiKey": "Generate an API key",
-      "createApiKeyDesc": "You'll need an API key to send events programmatically",
-      "createEndpoint": "Add a webhook endpoint",
-      "createEndpointDesc": "Register the URL where you want to receive webhooks",
-      "createIncomingDestination": "Add a forwarding destination",
-      "createIncomingDestinationDesc": "Configure the URL where incoming events should be forwarded to",
-      "createIncomingSource": "Create an incoming source",
-      "createIncomingSourceDesc": "Set up an ingress endpoint to receive webhooks from GitHub, Stripe, or any provider",
-      "createProject": "Create a project",
-      "createProjectDesc": "Projects organize your endpoints, events, and API keys",
-      "createSubscription": "Subscribe to event types",
-      "createSubscriptionDesc": "Link your endpoint to specific event types",
-      "enableHmac": "Enable HMAC verification",
-      "enableHmacDesc": "Secure your ingress by enabling signature verification — prevents unauthorized event injection",
+      "addDestination": "Add a destination",
+      "addDestinationDesc": "Where verified events go next.",
+      "createApiKey": "Create an API key",
+      "createApiKeyDesc": "Your backend presents it to send events.",
+      "createConnection": "Create a connection",
+      "createConnectionDesc": "An endpoint, its signing secret, and the event types it receives.",
+      "createSource": "Connect a source",
+      "createSourceDesc": "An ingress URL for Stripe, GitHub, or anything that sends webhooks.",
+      "seeDelivery": "See it delivered",
+      "seeDeliveryDesc": "Every attempt, with the response it got.",
       "sendEvent": "Send your first event",
-      "sendEventDesc": "Send a test event and see it delivered to your endpoint",
-      "testIncomingCurl": "Send a test webhook",
-      "testIncomingCurlDesc": "Use the ingress URL to send a cURL request and verify the source accepts events",
-      "verifyForwarding": "Verify event forwarding",
-      "verifyForwardingDesc": "Check the incoming events page to confirm events are received and forwarded"
+      "sendEventDesc": "Send a test event and watch it go out.",
+      "verifySource": "Verify what it sends",
+      "verifySourceDesc": "Check signatures so only the real provider can reach you."
     },
-    "subtitle": "Complete these steps to set up your webhook infrastructure",
-    "tabIncoming": "Incoming Webhooks",
-    "tabOutgoing": "Outgoing Webhooks",
-    "title": "Getting Started",
-    "trackIncoming": "Receive & forward external webhooks",
-    "trackOutgoing": "Send webhooks to your consumers"
+    "subtitle": "What's left before your webhooks are flowing.",
+    "title": "Getting started"
+  },
+  "org": {
+    "currentOrganization": "Current organization: {{name}}",
+    "switchFailed": "Could not switch organization. Please try again.",
+    "switcherLabel": "Switch organization"
   },
   "orgSettings": {
     "access": "Access control",
@@ -3154,6 +3181,12 @@
     "patternName": "Pattern name",
     "patternNamePlaceholder": "email, phone, card",
     "seedDefaults": "Seed defaults",
+    "stats": {
+      "active": "Active",
+      "builtin": "Built-in",
+      "custom": "Custom",
+      "total": "Total"
+    },
     "status": "Status",
     "subtitle": "Configure which fields are masked before sharing event payloads",
     "title": "PII Masking Rules",
@@ -3168,13 +3201,7 @@
       "updateFailed": "Failed to update rule",
       "updated": "Masking rule updated"
     },
-    "type": "Type",
-    "stats": {
-      "active": "Active",
-      "builtin": "Built-in",
-      "custom": "Custom",
-      "total": "Total"
-    }
+    "type": "Type"
   },
   "projects": {
     "copyIdOf": "Copy the ID of {{name}}",
@@ -3340,6 +3367,29 @@
       "loadFailed": "Failed to load replay sessions"
     }
   },
+  "roles": {
+    "DEVELOPER": {
+      "can1": "Create endpoints, subscriptions and rules",
+      "can2": "Send events and replay deliveries",
+      "can3": "Read the audit log",
+      "name": "Developer",
+      "summary": "Builds and runs the integrations, but cannot change who has access."
+    },
+    "OWNER": {
+      "can1": "Create and delete projects",
+      "can2": "Invite and remove members",
+      "can3": "Manage billing and API keys",
+      "name": "Owner",
+      "summary": "Full control of the organization, its billing and its members."
+    },
+    "VIEWER": {
+      "can1": "Read events, deliveries and analytics",
+      "can2": "Open a delivery and its attempts",
+      "can3": "Cannot create, edit or replay",
+      "name": "Viewer",
+      "summary": "Reads what happened. Changes nothing."
+    }
+  },
   "rules": {
     "actionTypes": {
       "DROP": "Drop event",
@@ -3379,13 +3429,13 @@
         "addGroup": "Add nested group",
         "cycleOperator": "Click to cycle: AND → OR → NOT",
         "emptyGroup": "This group is empty — add a condition or it matches everything.",
-        "removeCondition": "Remove condition",
-        "removeGroup": "Remove group",
         "groupHint": {
           "AND": "Every condition in this group has to match.",
-          "OR": "Any one condition in this group is enough.",
-          "NOT": "This group matches when the condition inside does not."
-        }
+          "NOT": "This group matches when the condition inside does not.",
+          "OR": "Any one condition in this group is enough."
+        },
+        "removeCondition": "Remove condition",
+        "removeGroup": "Remove group"
       },
       "conditions": "Conditions",
       "description": "Description",
@@ -3412,6 +3462,26 @@
     },
     "noActions": "No actions — this rule only records a match",
     "noResults": "No rules match your search.",
+    "operators": {
+      "BETWEEN": "is between",
+      "CONTAINS": "contains",
+      "ENDS_WITH": "ends with",
+      "EQ": "equals",
+      "EXISTS": "is present",
+      "GT": "is greater than",
+      "GTE": "is at least",
+      "IN": "is one of",
+      "IS_NULL": "is null",
+      "LT": "is less than",
+      "LTE": "is at most",
+      "NEQ": "does not equal",
+      "NOT_CONTAINS": "does not contain",
+      "NOT_EXISTS": "is absent",
+      "NOT_IN": "is none of",
+      "NOT_NULL": "is not null",
+      "REGEX": "matches",
+      "STARTS_WITH": "starts with"
+    },
     "saveFailed": "Failed to save rule",
     "search": "Search rules…",
     "showDetails": "Show rule details",
@@ -3426,27 +3496,7 @@
     "title": "Rules Engine",
     "toggleFailed": "Failed to toggle rule",
     "updated": "Rule updated successfully",
-    "updatedAt": "Updated",
-    "operators": {
-      "EQ": "equals",
-      "NEQ": "does not equal",
-      "GT": "is greater than",
-      "GTE": "is at least",
-      "LT": "is less than",
-      "LTE": "is at most",
-      "BETWEEN": "is between",
-      "CONTAINS": "contains",
-      "NOT_CONTAINS": "does not contain",
-      "STARTS_WITH": "starts with",
-      "ENDS_WITH": "ends with",
-      "IN": "is one of",
-      "NOT_IN": "is none of",
-      "REGEX": "matches",
-      "EXISTS": "is present",
-      "NOT_EXISTS": "is absent",
-      "IS_NULL": "is null",
-      "NOT_NULL": "is not null"
-    }
+    "updatedAt": "Updated"
   },
   "schemas": {
     "addFirstType": "Add the first event type",
@@ -3458,9 +3508,9 @@
       "changed": "changed",
       "relaxed": "no longer required",
       "removed": "removed",
-      "tightened": "now required",
       "showAll": "Show all {{count}} changes",
       "showLess": "Show less",
+      "tightened": "now required",
       "title": "Recent Changes"
     },
     "breakingChange": "Breaking",
@@ -3510,8 +3560,12 @@
     "searchTypes": "Filter event types…",
     "selectEventType": "Select an event type",
     "selectEventTypeHint": "Choose an event type from the left panel to view its schemas and history",
+    "status": {
+      "ACTIVE": "Active"
+    },
     "subtitle": "Manage event type contracts, versioned schemas, and track breaking changes",
     "title": "Schema Registry",
+    "typeCount": "Event types · {{count}}",
     "uploadHint": "Schema will be fingerprinted and diffed automatically",
     "uploadSchema": "Upload Schema",
     "uploadVersion": "Upload",
@@ -3533,11 +3587,7 @@
     "versionNote": "Version note",
     "versionNotePlaceholder": "What changed in this version?",
     "versionPromoted": "Schema version activated",
-    "versions": "Versions",
-    "status": {
-      "ACTIVE": "Active"
-    },
-    "typeCount": "Event types · {{count}}"
+    "versions": "Versions"
   },
   "settings": {
     "accountStatus": "Account status",
@@ -3555,9 +3605,19 @@
     "deviceOnly": "These preferences are stored in this browser only.",
     "email": "Email",
     "emailStatus": "Email status",
+    "emailUnverified": "Not confirmed",
     "fullName": "Full name",
     "fullNameHint": "Shown to other members of your organization.",
     "fullNamePlaceholder": "John Doe",
+    "gettingStarted": {
+      "askAgain": "Ask which direction again",
+      "askAgainHint": "Forgets whether you send webhooks, receive them, or both.",
+      "asked": "The checklist will ask again on your next visit.",
+      "description": "The checklist on your dashboard, and the question it asks first.",
+      "show": "Show the getting-started checklist",
+      "showHint": "Brings it back on every project you dismissed it for.",
+      "title": "Getting started"
+    },
     "newPassword": "New password",
     "newPasswordHint": "Min 8 characters, must include uppercase, lowercase, digit, and special character",
     "notifications": {
@@ -3598,6 +3658,27 @@
       "tip4": "Review the Audit Log weekly for suspicious activity",
       "title": "Security"
     },
+    "sessions": {
+      "client": {
+        "CLI": "Command line",
+        "WEB": "Browser"
+      },
+      "description": "Everything currently signed in to your account, including logins from the command line.",
+      "meta": "{{ip}} · last active {{lastSeen}}",
+      "revoke": "Sign out",
+      "revokeAll": "Sign out everywhere",
+      "revokeAllDesc": "Every device, including this one, is signed out immediately. Use this if you think someone else has access to your account.",
+      "revokeAllTitle": "Sign out everywhere?",
+      "revokeCurrentDesc": "This is the device you are using. You will be signed out and returned to the login screen.",
+      "revokeDesc": "That device is signed out immediately and has to sign in again.",
+      "revokeFailed": "Could not sign that session out. Please try again.",
+      "revokeTitle": "Sign this session out?",
+      "revoked": "Session signed out",
+      "signedInAt": "Signed in {{at}}",
+      "thisDevice": "This device",
+      "title": "Active sessions",
+      "unknownIp": "unknown address"
+    },
     "subtitle": "Manage your account and organization settings",
     "timezone": {
       "description": "Set your preferred timezone for displaying dates and times",
@@ -3612,47 +3693,7 @@
       "profileUpdated": "Profile updated successfully"
     },
     "yourAccess": "Your access",
-    "yourAccessDesc": "The role you hold in this organization and what it lets you do.",
-    "emailUnverified": "Not confirmed",
-    "sessions": {
-      "title": "Active sessions",
-      "description": "Everything currently signed in to your account, including logins from the command line.",
-      "thisDevice": "This device",
-      "unknownIp": "unknown address",
-      "meta": "{{ip}} · last active {{lastSeen}}",
-      "signedInAt": "Signed in {{at}}",
-      "revoke": "Sign out",
-      "revoked": "Session signed out",
-      "revokeFailed": "Could not sign that session out. Please try again.",
-      "revokeTitle": "Sign this session out?",
-      "revokeDesc": "That device is signed out immediately and has to sign in again.",
-      "revokeCurrentDesc": "This is the device you are using. You will be signed out and returned to the login screen.",
-      "revokeAll": "Sign out everywhere",
-      "revokeAllTitle": "Sign out everywhere?",
-      "revokeAllDesc": "Every device, including this one, is signed out immediately. Use this if you think someone else has access to your account.",
-      "client": {
-        "WEB": "Browser",
-        "CLI": "Command line"
-      }
-    }
-  },
-  "signatureScheme": {
-    "label": "Signature headers",
-    "desc": "Which signature Hookflow puts on every delivery to this endpoint. A receiver ignores the headers it does not read, so sending a set it has never seen breaks nothing that already works.",
-    "both": {
-      "title": "Both header sets",
-      "desc": "Verify whichever one you already have code for, and move to the other later without a deploy on both sides at once. The default, and the answer when you are not sure."
-    },
-    "standard": {
-      "title": "Standard Webhooks only",
-      "desc": "The convention OpenAI, Twilio, PagerDuty and Supabase send, so an off-the-shelf Standard Webhooks library verifies it and you write no signing code. Verify with the whsec_… secret, not the raw one."
-    },
-    "legacy": {
-      "title": "X-Signature only",
-      "desc": "Hookflow’s own header: HMAC-SHA256 of <t>.<raw body> in hex, keyed with the raw secret. Choose it when your receiver already verifies this and you would rather it saw nothing else."
-    },
-    "saved": "Signature headers updated",
-    "saveFailed": "Could not change the signature headers"
+    "yourAccessDesc": "The role you hold in this organization and what it lets you do."
   },
   "sharedDebug": {
     "error": "Something went wrong loading this debug link.",
@@ -3668,6 +3709,24 @@
     "subtitle": "PII-masked event payload shared for debugging",
     "title": "Shared Debug Link",
     "unavailable": "Link unavailable"
+  },
+  "signatureScheme": {
+    "both": {
+      "desc": "Verify whichever one you already have code for, and move to the other later without a deploy on both sides at once. The default, and the answer when you are not sure.",
+      "title": "Both header sets"
+    },
+    "desc": "Which signature Hookflow puts on every delivery to this endpoint. A receiver ignores the headers it does not read, so sending a set it has never seen breaks nothing that already works.",
+    "label": "Signature headers",
+    "legacy": {
+      "desc": "Hookflow’s own header: HMAC-SHA256 of <t>.<raw body> in hex, keyed with the raw secret. Choose it when your receiver already verifies this and you would rather it saw nothing else.",
+      "title": "X-Signature only"
+    },
+    "saveFailed": "Could not change the signature headers",
+    "saved": "Signature headers updated",
+    "standard": {
+      "desc": "The convention OpenAI, Twilio, PagerDuty and Supabase send, so an off-the-shelf Standard Webhooks library verifies it and you write no signing code. Verify with the whsec_… secret, not the raw one.",
+      "title": "Standard Webhooks only"
+    }
   },
   "subscriptions": {
     "allEndpoints": "All endpoints",
@@ -3860,14 +3919,14 @@
     "errors": {
       "conflict": "This action conflicts with an existing resource.",
       "forbidden": "You don't have permission to perform this action.",
+      "locked": "Too many failed sign-in attempts. Wait for the lockout to lapse, or reset your password to unlock the account now.",
       "network": "Network error. Check your connection and try again.",
       "notFound": "The requested resource was not found.",
       "payloadTooLarge": "Request body is too large. Please reduce the payload size.",
       "server": "Something went wrong on our end. Please try again later.",
       "tooManyRequests": "Too many requests. Please wait a moment.",
       "unauthorized": "Session expired. Please sign in again.",
-      "validation": "Please check your input and try again.",
-      "locked": "Too many failed sign-in attempts. Wait for the lockout to lapse, or reset your password to unlock the account now."
+      "validation": "Please check your input and try again."
     },
     "retry": "Retry"
   },
@@ -4062,23 +4121,48 @@
       "success": "Successful",
       "title": "Delivery Breakdown (30d)"
     },
+    "description": "What this project has used, and what your plan allows.",
     "history": {
       "date": "Date",
       "deliveries": "Deliveries",
+      "desc": "Every day in the selected range",
       "dlq": "DLQ",
+      "empty": "No days recorded yet",
       "events": "Events",
       "failed": "Failed",
       "success": "Success",
-      "title": "Daily History",
-      "desc": "Every day in the selected range",
-      "empty": "No days recorded yet"
+      "title": "Daily History"
+    },
+    "loadFailed": "Couldn't load usage for this project",
+    "mix": {
+      "abandoned": "Abandoned",
+      "delivered": "Delivered",
+      "desc": "Across the selected range",
+      "failed": "Failed",
+      "inFlight": "In flight",
+      "title": "Where deliveries ended up",
+      "total": "{{total}} deliveries in total"
     },
     "noData": "No usage data",
     "noDataDesc": "Start sending events to see usage metrics",
+    "periodLabel": "Time range",
     "periods": {
       "30d": "Last 30 days",
       "7d": "Last 7 days",
       "90d": "Last 90 days"
+    },
+    "quota": {
+      "approaching": "Near limit",
+      "desc": "This billing period, {{from}} to {{to}}",
+      "descPending": "This billing period, across the organization",
+      "endpoints": "Endpoints",
+      "events": "Events",
+      "members": "Members",
+      "ofLimit": "{{percent}}% of {{limit}}",
+      "over": "Over limit",
+      "projects": "Projects",
+      "title": "Plan limits",
+      "unlimited": "No limit on your plan"
     },
     "resources": {
       "alertRules": "Alert Rules",
@@ -4092,46 +4176,21 @@
       "successRate": "Success Rate"
     },
     "subtitle": "Resource usage for <strong>{{project}}</strong>",
-    "title": "Usage & Metrics",
-    "description": "What this project has used, and what your plan allows.",
-    "loadFailed": "Couldn't load usage for this project",
-    "periodLabel": "Time range",
-    "quota": {
-      "title": "Plan limits",
-      "desc": "This billing period, {{from}} to {{to}}",
-      "descPending": "This billing period, across the organization",
-      "events": "Events",
-      "endpoints": "Endpoints",
-      "projects": "Projects",
-      "members": "Members",
-      "ofLimit": "{{percent}}% of {{limit}}",
-      "unlimited": "No limit on your plan",
-      "approaching": "Near limit",
-      "over": "Over limit"
-    },
-    "traffic": {
-      "title": "Deliveries by day",
-      "desc": "Delivered and failed, one bar per day",
-      "delivered": "Delivered",
-      "failed": "Failed",
-      "empty": "No deliveries in this window"
-    },
-    "mix": {
-      "title": "Where deliveries ended up",
-      "desc": "Across the selected range",
-      "delivered": "Delivered",
-      "inFlight": "In flight",
-      "failed": "Failed",
-      "abandoned": "Abandoned",
-      "total": "{{total}} deliveries in total"
-    },
     "tiles": {
+      "alertRulesHint": "Watching this project",
+      "endpointsHint": "Registered and enabled",
       "events": "Events",
       "eventsHint": "Announced by your systems",
       "incoming": "Incoming events",
-      "incomingHint": "Received from your sources",
-      "endpointsHint": "Registered and enabled",
-      "alertRulesHint": "Watching this project"
+      "incomingHint": "Received from your sources"
+    },
+    "title": "Usage & Metrics",
+    "traffic": {
+      "delivered": "Delivered",
+      "desc": "Delivered and failed, one bar per day",
+      "empty": "No deliveries in this window",
+      "failed": "Failed",
+      "title": "Deliveries by day"
     }
   },
   "verifyEmail": {
@@ -4146,49 +4205,6 @@
     "successAutoLogin": "Your email has been verified! Logging you in automatically...",
     "successDesc": "Your email has been successfully verified. You can now use all features.",
     "verifying": "Verifying your email..."
-  },
-  "wizard": {
-    "apiKey": {
-      "description": "API keys are used to authenticate when sending events programmatically from your backend services.",
-      "tip": "Store your API key securely — it's shown only once at creation time.",
-      "title": "Generate an API Key"
-    },
-    "back": "Back",
-    "done": {
-      "description": "Your webhook infrastructure is ready. Head to your project to start sending events and monitoring deliveries.",
-      "title": "You're All Set!"
-    },
-    "endpoint": {
-      "description": "Endpoints are the URLs where your webhooks will be delivered. Add the URL of your server that will receive webhook events.",
-      "tip": "Each endpoint gets a unique signing secret for HMAC signature verification.",
-      "title": "Register an Endpoint"
-    },
-    "getStarted": "Get started",
-    "goThere": "Go there",
-    "letsGo": "Let's go",
-    "next": "Next",
-    "project": {
-      "description": "Projects are the top-level containers that organize your endpoints, events, subscriptions, and API keys.",
-      "tip": "Think of projects as separate environments — e.g. \"Production\", \"Staging\", or per-customer.",
-      "title": "Create a Project"
-    },
-    "send": {
-      "curlCopied": "Curl command copied!",
-      "curlLabel": "Quick test with curl:",
-      "description": "Use the API or the UI to send a test event. It will be matched against subscriptions and delivered to the right endpoints.",
-      "tip": "Check the Deliveries page to see real-time status, attempts, and response details.",
-      "title": "Send Your First Event"
-    },
-    "subscription": {
-      "description": "Subscriptions link your endpoints to specific event types. Only events matching the subscription will be delivered.",
-      "tip": "Use wildcards like \"order.*\" to subscribe to all order-related events.",
-      "title": "Subscribe to Events"
-    },
-    "welcome": {
-      "description": "We'll walk you through the key steps to set up your webhook infrastructure in just a few minutes.",
-      "timeEstimate": "~5 minutes to first delivery",
-      "title": "Welcome to Hookflow! 🎉"
-    }
   },
   "workflows": {
     "builder": {
@@ -4376,80 +4392,15 @@
       "triggered": "Workflow executed"
     },
     "totalExecutions": "Total executions",
+    "triggerTypes": {
+      "MANUAL": "Manual",
+      "SCHEDULE": "On a schedule",
+      "WEBHOOK_EVENT": "On event"
+    },
     "updated": "Updated {{date}}",
     "validation": {
       "required": "This field is required"
     },
-    "version": "v{{version}}",
-    "triggerTypes": {
-      "WEBHOOK_EVENT": "On event",
-      "MANUAL": "Manual",
-      "SCHEDULE": "On a schedule"
-    }
-  },
-  "charts": {
-    "empty": "Nothing to plot yet"
-  },
-  "roles": {
-    "OWNER": {
-      "name": "Owner",
-      "summary": "Full control of the organization, its billing and its members.",
-      "can1": "Create and delete projects",
-      "can2": "Invite and remove members",
-      "can3": "Manage billing and API keys"
-    },
-    "DEVELOPER": {
-      "name": "Developer",
-      "summary": "Builds and runs the integrations, but cannot change who has access.",
-      "can1": "Create endpoints, subscriptions and rules",
-      "can2": "Send events and replay deliveries",
-      "can3": "Read the audit log"
-    },
-    "VIEWER": {
-      "name": "Viewer",
-      "summary": "Reads what happened. Changes nothing.",
-      "can1": "Read events, deliveries and analytics",
-      "can2": "Open a delivery and its attempts",
-      "can3": "Cannot create, edit or replay"
-    }
-  },
-  "contact": {
-    "communityBody": "Open an issue on GitHub — self-hosted questions get answered there too.",
-    "communityCta": "Open an issue",
-    "communityTitle": "Bugs and feature requests",
-    "docsBody": "Most integration questions are answered in the guides.",
-    "docsCta": "Go to the docs",
-    "docsTitle": "Read first",
-    "responseNote": "We answer on working days, usually within one.",
-    "salesBody": "Plans above Pro, annual billing and volume commitments.",
-    "salesTitle": "Sales",
-    "subtitle": "Enterprise plans, volume pricing, self-hosted support, or a question the docs did not answer.",
-    "supportBody": "Something is wrong with a delivery, an account or a bill.",
-    "supportTitle": "Support",
-    "title": "Talk to us"
-  },
-  "meta": {
-    "contact": {
-      "description": "Talk to us about Enterprise plans, volume pricing or self-hosted support.",
-      "title": "Contact — Hookflow"
-    },
-    "docs": {
-      "description": "How to send events, receive webhooks, verify signatures, and read what happened — guides and the full API reference.",
-      "title": "Documentation — Hookflow",
-      "titleSection": "{{section}} — Hookflow docs"
-    },
-    "landing": {
-      "description": "Send webhooks to your customers' endpoints and receive them from Stripe, GitHub or Slack. HMAC-signed, retried on a ladder from 1 minute to 24 hours, with Failed Messages and replay. Free for 10,000 events a month, or self-host under MIT.",
-      "title": "Hookflow — Webhook infrastructure, both directions"
-    },
-    "pricing": {
-      "description": "Free for 10,000 events a month. Starter $29, Pro $99, Enterprise on request — or run the MIT-licensed build yourself with no limits at all.",
-      "title": "Pricing — Hookflow"
-    }
-  },
-  "org": {
-    "switcherLabel": "Switch organization",
-    "currentOrganization": "Current organization: {{name}}",
-    "switchFailed": "Could not switch organization. Please try again."
+    "version": "v{{version}}"
   }
 }

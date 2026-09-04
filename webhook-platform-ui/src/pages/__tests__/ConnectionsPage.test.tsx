@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -109,6 +110,21 @@ async function expandTheRow() {
 describe('ConnectionsPage — signature scheme', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('still opens the setup flow from "New connection" after the dialog moved out of this page', async () => {
+    // The dialog chrome now lives in ConnectionSetupDialog so the dashboard can
+    // open the same flow. This guards the extraction, and in particular the
+    // `open &&` mount guard: without it the flow keeps the previous attempt's
+    // step, endpoint id and secret.
+    arrange();
+    const user = userEvent.setup();
+    renderConnections();
+
+    await user.click(await screen.findByRole('button', { name: /New connection/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('New connection')).toBeInTheDocument();
   });
 
   it('shows the endpoint’s current scheme as the selected option', async () => {
