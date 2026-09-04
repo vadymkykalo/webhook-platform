@@ -2853,7 +2853,7 @@
       "popular": "Most popular",
       "pro": "Pro",
       "projects": "projects",
-      "rate": "requests / second",
+      "rate": "ingest requests / second",
       "retention": "days retention",
       "rowMtls": "mTLS client certificates",
       "rowSupport": "Priority support",
