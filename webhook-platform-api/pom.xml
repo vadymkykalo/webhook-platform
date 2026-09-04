@@ -48,9 +48,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
+        <!--
+          The starter rather than bare spring-kafka: Boot 4 moved the Kafka
+          auto-configuration out of spring-boot-autoconfigure into its own
+          spring-boot-kafka module, which only the starter pulls in. Without it
+          the spring.kafka.* block in application.yml would bind to nothing and
+          the autoconfigure.exclude in the integration tests would name a class
+          that is not on the classpath, which Boot treats as a startup failure.
+        -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -186,6 +194,32 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Boot 4 split spring-boot-test-autoconfigure apart: @AutoConfigureMockMvc,
+          @DataJpaTest, TestEntityManager and @AutoConfigureTestDatabase each moved into a
+          module of their own, and spring-boot-starter-test no longer carries any of them.
+          These four starters are that one dependency, unbundled.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jpa-test</artifactId>
             <scope>test</scope>
         </dependency>
         <!-- 1.21.4 is already the latest 1.x release (matches Spring
