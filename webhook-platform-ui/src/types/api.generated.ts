@@ -5237,7 +5237,8 @@ export interface components {
             /** Format: int64 */
             p95LatencyMs?: number;
             lastDeliveryAt?: string;
-            status?: string;
+            /** @enum {string} */
+            status?: "HEALTHY" | "DEGRADED" | "FAILING";
         };
         EventTypeBreakdown: {
             eventType?: string;

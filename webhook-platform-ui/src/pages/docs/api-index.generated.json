@@ -8493,7 +8493,12 @@
       {
         "name": "status",
         "type": "string",
-        "required": false
+        "required": false,
+        "values": [
+          "HEALTHY",
+          "DEGRADED",
+          "FAILING"
+        ]
       }
     ],
     "EndpointRequest": [
@@ -13477,7 +13482,7 @@
           "avgLatencyMs": 0,
           "p95LatencyMs": 0,
           "lastDeliveryAt": "string",
-          "status": "string"
+          "status": "HEALTHY"
         }
       ],
       "latencyPercentiles": {
@@ -13808,7 +13813,7 @@
       "avgLatencyMs": 0,
       "p95LatencyMs": 0,
       "lastDeliveryAt": "string",
-      "status": "string"
+      "status": "HEALTHY"
     },
     "EndpointRequest": {
       "url": "string",

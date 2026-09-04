@@ -6,6 +6,8 @@ import yaml from 'js-yaml';
 import en from '../locales/en.json';
 import uk from '../locales/uk.json';
 import { STATUS_KIND } from '../../pages/EventsPage';
+import { STATUS_TEXT } from '../../components/charts/statusScale';
+import { nodeTemplates } from '../../components/workflow/nodes/nodeTypes';
 
 /**
  * Locale parity (en vs uk) cannot catch a key missing from *both* files, and
@@ -54,6 +56,11 @@ const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, u
   ['roles', 'MemberResponse', 'role', ['API_KEY']],
   ['rules.actionTypes', 'RuleActionResponse', 'type'],
   ['workflows.triggerTypes', 'WorkflowResponse', 'triggerType'],
+  // The dashboard says the same five statuses in its own words -- "Abandoned" where the
+  // deliveries table says "DLQ" -- so it is a second set of labels over one enum, and it
+  // drifts separately.
+  ['dashboard.inFlight.status', 'DeliveryResponse', 'status'],
+  ['analytics.endpointStatus', 'EndpointPerformance', 'status'],
 ];
 
 function labelsUnder(locale: object, namespace: string): Record<string, unknown> {
@@ -101,4 +108,48 @@ describe('interpolated translation keys resolve', () => {
       expect(Object.keys(STATUS_KIND).filter((k) => !(k in labels))).toEqual([]);
     },
   );
+
+  /* The dashboard's one-word answer to "is this project healthy". Derived by
+     verdictOfDeliveryStats from the delivery rollup, so it is a StatusKind and
+     nothing the API names. STATUS_TEXT is a Record over that union, which makes
+     its keys the complete set for the same reason STATUS_KIND is.
+
+     Only the forward direction is checked: the namespace also carries `label`,
+     `detail` and `idleDetail`, which are prose around the verdict rather than
+     values of it. */
+  it.each([['en', en], ['uk', uk]] as const)(
+    'dashboard.verdict has a label for every status kind (%s)',
+    (_name, locale) => {
+      const labels = labelsUnder(locale, 'dashboard.verdict');
+      expect(Object.keys(STATUS_TEXT).filter((k) => !(k in labels))).toEqual([]);
+    },
+  );
+
+  /* Workflow node types. Not an enum at either end: the nine types are a
+     frontend catalogue, and the canvas renders each one's name and its one-line
+     description from the locale whenever the node carries no label of its own —
+     which is every node the moment it is dropped. A missing entry here is a
+     palette item reading `workflows.nodeTypes.slack.label`.
+
+     `nodeTemplates` is typed against the map React Flow is handed, so a
+     template for a type with no component does not compile and this list cannot
+     fall behind the canvas. */
+  describe('workflows.nodeTypes', () => {
+    it.each([['en', en], ['uk', uk]] as const)('%s names and describes every node type', (_name, locale) => {
+      const labels = labelsUnder(locale, 'workflows.nodeTypes');
+      const missing = nodeTemplates.flatMap(({ type }) => {
+        const entry = labels[type] as Record<string, unknown> | undefined;
+        return ['label', 'description']
+          .filter((field) => typeof entry?.[field] !== 'string')
+          .map((field) => `${type}.${field}`);
+      });
+      expect(missing).toEqual([]);
+    });
+
+    it('carries no entry for a node type the palette cannot offer', () => {
+      const offered = new Set<string>(nodeTemplates.map((t) => t.type));
+      expect(Object.keys(labelsUnder(en, 'workflows.nodeTypes')).filter((k) => !offered.has(k)))
+        .toEqual([]);
+    });
+  });
 });
